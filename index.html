@@ -1,0 +1,1236 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#12161b">
+<title>Plechárna – idle hra</title>
+<style>
+:root{--bg:#12161b;--panel:#1b2128;--panel2:#232b34;--line:#2f3945;--tx:#e8edf2;--mut:#8b98a6;--acc:#ff9f1c;--acc2:#ffbf69;--ok:#4cc38a;--bad:#ef5b5b}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+button,input,textarea{font:inherit;color:inherit}
+#app{min-height:100dvh;display:flex}
+#col{flex:1;min-width:0;max-width:640px;margin:0 auto;display:flex;flex-direction:column}
+header{position:sticky;top:0;z-index:5;background:var(--bg);padding:10px 14px;padding-top:max(10px,env(safe-area-inset-top));border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:10px}
+.money{font-size:1.35rem;font-weight:700;color:var(--acc)}
+.sub{font-size:.8rem;color:var(--mut)}
+.rep{font-size:1.1rem;font-weight:600;text-align:right}
+main{flex:1;padding:12px 14px 30px}
+nav{position:sticky;top:0;align-self:flex-start;height:100dvh;width:72px;flex:none;z-index:6;background:var(--panel);border-right:1px solid var(--line);padding-top:env(safe-area-inset-top);padding-left:env(safe-area-inset-left);overflow-y:auto}
+nav .in{display:flex;flex-direction:column}
+nav button{background:none;border:0;border-left:3px solid transparent;padding:14px 2px 12px;font-size:.66rem;color:var(--mut);display:flex;flex-direction:column;align-items:center;gap:3px;touch-action:manipulation;cursor:pointer;width:100%}
+nav button span{font-size:1.4rem}
+nav button.on{color:var(--acc);border-left-color:var(--acc);background:var(--panel2)}
+@media(min-width:700px){
+  nav{width:150px}
+  nav button{flex-direction:row;gap:10px;justify-content:flex-start;padding:14px 14px;font-size:.92rem}
+  nav button span{font-size:1.25rem}
+}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px}
+.card h3{margin:0 0 6px}
+.row{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.small{font-size:.82rem;color:var(--mut)}
+.row.small{margin-top:8px;flex-wrap:wrap}
+.row.small b{color:var(--tx)}
+.tag{background:var(--panel2);border-radius:20px;padding:2px 10px;font-size:.85rem}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.chip{font-size:.78rem;background:var(--panel2);border:1px solid var(--line);color:var(--mut);border-radius:20px;padding:2px 9px}
+.chip.cur{border-color:var(--acc);color:var(--acc)}
+.chip.done{background:#173326;border-color:#244f3a;color:var(--ok)}
+.bar{height:10px;background:var(--panel2);border-radius:6px;overflow:hidden;margin-top:6px}
+.bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--acc),var(--acc2))}
+.btn{background:var(--acc);color:#1a1205;border:0;border-radius:10px;padding:11px 14px;font-weight:700;cursor:pointer;touch-action:manipulation;min-height:44px}
+.btn:disabled{background:var(--panel2);color:var(--mut);cursor:not-allowed}
+.btn.full{width:100%;margin-top:10px}
+.btn.ghost{background:var(--panel2);color:var(--tx)}
+.btn.danger{background:#3a1f22;color:#ff9a9a}
+.btn.work{width:100%;margin-top:10px;font-size:1.05rem;padding:14px}
+.hint{font-size:.88rem;color:var(--mut);margin:0 2px 10px}
+.hint b{color:var(--tx)}
+.empty{text-align:center;color:var(--mut);padding:30px 10px}
+h2.sec{font-size:.95rem;margin:16px 2px 8px;color:var(--acc2)}
+.slim{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.slim .btn{min-width:110px}
+textarea{width:100%;min-height:80px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px;font-size:.75rem}
+input[type=text]{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px;margin-top:4px}
+#start{position:fixed;inset:0;z-index:20;background:var(--bg);overflow:auto;padding:20px 14px 40px}
+#start[hidden]{display:none}
+.start-box{max-width:560px;margin:0 auto}
+.start-box h1{margin:6px 0}
+.pick{display:block;width:100%;text-align:left;cursor:pointer}
+.pick:hover{border-color:var(--acc)}
+.pick b{display:block;font-size:1.05rem}
+.pick span{display:block;color:var(--mut);font-size:.88rem;margin:3px 0}
+.pick em{display:block;font-style:normal;color:var(--acc2);font-size:.85rem}
+#toast{position:fixed;left:0;right:0;top:70px;z-index:30;display:flex;flex-direction:column;align-items:center;gap:6px;pointer-events:none}
+#toast div{background:var(--panel2);border:1px solid var(--acc);border-radius:10px;padding:8px 14px;font-size:.9rem;max-width:92%;box-shadow:0 4px 14px #0008}
+#toast div.bad{border-color:var(--bad)}
+.pick:disabled{opacity:.45;cursor:not-allowed}
+#modal{position:fixed;inset:0;z-index:25;background:#000b;display:flex;align-items:center;justify-content:center;padding:14px}
+#modal[hidden]{display:none}
+.mbox{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;max-width:440px;width:100%;max-height:92dvh;overflow:auto}
+.mbox h3{margin:0 0 4px}
+.mbox .opt{margin-top:6px}
+.pick.sel{border-color:var(--acc);background:var(--panel2)}
+button.chip{cursor:pointer;min-height:36px;touch-action:manipulation}
+.btns{display:flex;flex-direction:column;gap:6px;min-width:110px}
+.btns .btn{min-height:38px;padding:8px 12px}
+select{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px;margin-top:4px;font:inherit;color:inherit}
+.row.small.block{display:block;line-height:1.7}
+</style>
+</head>
+<body>
+<div id="app">
+  <nav><div class="in" id="tabs"></div></nav>
+  <div id="col">
+    <header>
+      <div><div class="money">💰 <span id="hMoney">0</span> Kč</div><div class="sub" id="hName"></div></div>
+      <div class="rep">⭐ <span id="hRep">0</span><div class="sub">reputace</div></div>
+    </header>
+    <main id="view"></main>
+  </div>
+</div>
+<div id="start" hidden></div>
+<div id="modal" hidden></div>
+<div id="toast"></div>
+
+<script>
+'use strict';
+/* ===================== DATA ===================== */
+const SAVE_KEY = 'plecharna_save_v1';
+const OFFLINE_CAP = 8 * 3600;           // max. offline postup (s)
+
+const STEPS = {
+  cut:    { name: 'Řezání',                  icon: '✂️' },
+  bend:   { name: 'Ohýbání',                 icon: '📐' },
+  roll:   { name: 'Stáčení',                 icon: '🔄' },
+  weld:   { name: 'Svařování',               icon: '🔥' },
+  fit:    { name: 'Zámečnické práce',        icon: '🔧' },   // vrtání, závitování, zahlubování
+  grind:  { name: 'Broušení pohledové',      icon: '✨' },
+  powder: { name: 'Práškové lakování',       icon: '🎨' },
+  wet:    { name: 'Mokré lakování',          icon: '🖌️' },
+  plate:  { name: 'Povrchové úpravy',        icon: '🧪' }    // pozink, elox ap.
+};
+const STEP_ORDER = ['cut', 'bend', 'roll', 'weld', 'fit', 'grind', 'powder', 'wet', 'plate'];
+
+const MACHINES = [
+  { id: 'shear',       step: 'cut',    name: 'Tabulové nůžky',                 price: 120,   rate: 0.6 },
+  { id: 'co2',         step: 'cut',    name: 'CO₂ laser',                      price: 1500,  rate: 3 },
+  { id: 'fiber',       step: 'cut',    name: 'Vláknový laser',                 price: 12000, rate: 16 },
+  { id: 'hand_bender', step: 'bend',   name: 'Ruční ohýbačka',                 price: 150,   rate: 0.6 },
+  { id: 'press',       step: 'bend',   name: 'Hydraulický ohraňovací lis',     price: 2000,  rate: 3.5 },
+  { id: 'cnc_press',   step: 'bend',   name: 'CNC ohraňovací lis',             price: 15000, rate: 18 },
+  { id: 'hand_roll',   step: 'roll',   name: 'Ruční zakružovačka',             price: 140,   rate: 0.6 },
+  { id: 'roll3',       step: 'roll',   name: 'Strojní zakružovačka (3 válce)', price: 2000,  rate: 3.3 },
+  { id: 'cnc_roll',    step: 'roll',   name: 'CNC zakružovací stroj',          price: 15000, rate: 17 },
+  { id: 'mig',         step: 'weld',   name: 'Svářečka MIG',                   price: 200,   rate: 0.5 },
+  { id: 'spot',        step: 'weld',   name: 'Bodová svářečka',                price: 2500,  rate: 3 },
+  { id: 'robot',       step: 'weld',   name: 'Svařovací robot',                price: 20000, rate: 17 },
+  { id: 'drill',       step: 'fit',    name: 'Stolní vrtačka',                 price: 80,    rate: 0.5 },
+  { id: 'drill_col',   step: 'fit',    name: 'Sloupová vrtačka se závitořezem',price: 1000,  rate: 2.6 },
+  { id: 'tap_cnc',     step: 'fit',    name: 'Závitovací a vrtací centrum',    price: 11000, rate: 15 },
+  { id: 'grind',       step: 'grind',  name: 'Ruční bruska',                   price: 100,   rate: 0.6 },
+  { id: 'belt',        step: 'grind',  name: 'Pásová bruska',                  price: 1600,  rate: 3 },
+  { id: 'brush_line',  step: 'grind',  name: 'Kartáčovací linka',              price: 13000, rate: 16 },
+  { id: 'powder_hand', step: 'powder', name: 'Ruční pistole + pec',            price: 200,   rate: 0.6 },
+  { id: 'powder_cab',  step: 'powder', name: 'Prášková kabina s pecí',         price: 2200,  rate: 3.2 },
+  { id: 'powder',      step: 'powder', name: 'Automatická prášková lakovna',   price: 14000, rate: 17 },
+  { id: 'spray',       step: 'wet',    name: 'Stříkací pistole',               price: 100,   rate: 0.6 },
+  { id: 'paint',       step: 'wet',    name: 'Lakovací kabina',                price: 1800,  rate: 3.2 },
+  { id: 'paintline',   step: 'wet',    name: 'Automatická lakovací linka',     price: 15000, rate: 17 },
+  { id: 'galv_small',  step: 'plate',  name: 'Malá pozinkovací vana',          price: 250,   rate: 0.5 },
+  { id: 'galv',        step: 'plate',  name: 'Galvanická linka (pozink)',      price: 3000,  rate: 3 },
+  { id: 'anod',        step: 'plate',  name: 'Eloxovací linka',                price: 18000, rate: 16 }
+];
+const MACH = Object.fromEntries(MACHINES.map(m => [m.id, m]));
+
+const STARTS = {
+  klempir: {
+    icon: '🔧', name: 'Klempířská dílna',
+    desc: 'Malá rodinná dílna: řezání a ohýbání. Ostatní operace musíte zatím kooperovat.',
+    money: 400, machines: { shear: 1, hand_bender: 1 }, worker: 'shear', techs: ['cut', 'bend'],
+    perk: { mat: 0.9 }, perkText: 'Materiál o 10 % levnější'
+  },
+  domaci: {
+    icon: '🏠', name: 'Domácí zámečnická dílna',
+    desc: 'Vrtání, závitování a zahlubování na stolní vrtačce. Levný start, zpočátku drobné zakázky.',
+    money: 350, machines: { drill: 1 }, worker: 'drill', techs: ['fit'],
+    perk: { speed: { fit: 1.25 } }, perkText: 'Zámečnické práce o 25 % rychlejší'
+  },
+  laser: {
+    icon: '🔦', name: 'Laserové řezání',
+    desc: 'Jen řezání, ale s CO₂ laserem. Vše ostatní kooperujete.',
+    money: 150, machines: { co2: 1 }, worker: 'co2', techs: ['cut'],
+    perk: { speed: { cut: 1.25 } }, perkText: 'Řezání o 25 % rychlejší'
+  },
+  ohybarna: {
+    icon: '📐', name: 'Ohýbárna',
+    desc: 'Jen ohýbání, ale s hydraulickým lisem. Řezání, svařování i povrchovky kooperujete.',
+    money: 250, machines: { press: 1 }, worker: 'press', techs: ['bend'],
+    perk: { speed: { bend: 1.25 } }, perkText: 'Ohýbání o 25 % rychlejší'
+  },
+  automotive: {
+    icon: '🚗', name: 'Subdodavatel pro automotive',
+    desc: 'Svařovna pro automotive: jen svařování. Zákazníci vás rychle doporučí dál.',
+    money: 200, machines: { mig: 1 }, worker: 'mig', techs: ['weld'],
+    perk: { rep: 2 }, perkText: 'Reputace roste 2× rychleji'
+  }
+};
+
+/* Výrobky řazené podle potřebné reputace. "svc_*" jsou zakázkové práce na dodaných dílech
+   (jedna operace), díky nim se uživí i firma s jediným řemeslem. */
+const PRODUCTS = [
+  { id: 'holder',     icon: '🔩', name: 'Držák',                          steps: ['cut','bend'],                              q: [6,14],  work: 2,   mat: 3,   price: 9,   rep: 0,   g: 1 },
+  { id: 'baseplate',  icon: '🔲', name: 'Montážní deska s otvory',        steps: ['cut','fit'],                               q: [6,14],  work: 2,   mat: 3,   price: 9,   rep: 0,   g: 1 },
+  { id: 'cover',      icon: '📦', name: 'Kryt rozvaděče',                 steps: ['cut','bend','powder'],                     q: [4,10],  work: 3,   mat: 8,   price: 28,  rep: 0,   g: 1 },
+  { id: 'svc_fit',    icon: '🔧', name: 'Vrtání a závitování dílů',       steps: ['fit'],                                     q: [20,50], work: 1.5, mat: 0.5, price: 4,   rep: 0,   g: 1 },
+  { id: 'svc_cut',    icon: '✂️', name: 'Zakázkové řezání',               steps: ['cut'],                                     q: [20,50], work: 1.5, mat: 2,   price: 5.5, rep: 0,   g: 1 },
+  { id: 'svc_bend',   icon: '📐', name: 'Zakázkové ohýbání',              steps: ['bend'],                                    q: [20,50], work: 1.5, mat: 1,   price: 5,   rep: 0,   g: 1 },
+  { id: 'svc_weld',   icon: '🔥', name: 'Zakázkové svařování',            steps: ['weld'],                                    q: [10,30], work: 2.5, mat: 1,   price: 8,   rep: 0,   g: 1 },
+  { id: 'svc_roll',   icon: '🔄', name: 'Zakázkové stáčení plechů',       steps: ['roll'],                                    q: [15,40], work: 2,   mat: 1.5, price: 6,   rep: 3,   g: 1 },
+  { id: 'svc_grind',  icon: '✨', name: 'Broušení pohledových dílů',      steps: ['grind'],                                   q: [15,40], work: 2,   mat: 0.5, price: 5.5, rep: 3,   g: 1 },
+  { id: 'svc_powder', icon: '🎨', name: 'Práškové lakování dílů',         steps: ['powder'],                                  q: [15,40], work: 2,   mat: 1,   price: 6,   rep: 3,   g: 1 },
+  { id: 'svc_wet',    icon: '🖌️', name: 'Mokré lakování dílů',            steps: ['wet'],                                     q: [15,40], work: 2,   mat: 1.2, price: 6.5, rep: 4,   g: 1 },
+  { id: 'grille',     icon: '🌬️', name: 'Větrací mřížka',                 steps: ['cut','bend','weld'],                       q: [5,12],  work: 3,   mat: 10,  price: 32,  rep: 5,   g: 1 },
+  { id: 'svc_plate',  icon: '🧪', name: 'Pozinkování a eloxování dílů',   steps: ['plate'],                                   q: [15,40], work: 2,   mat: 1.5, price: 7,   rep: 5,   g: 1 },
+  { id: 'chimney',    icon: '🏭', name: 'Plechový komín',                 steps: ['cut','roll','weld'],                       q: [5,12],  work: 3.5, mat: 12,  price: 42,  rep: 8,   g: 1 },
+  { id: 'sink',       icon: '🚰', name: 'Nerezový dřez',                  steps: ['cut','bend','weld','grind'],               q: [3,8],   work: 4,   mat: 30,  price: 100, rep: 12,  g: 2 },
+  { id: 'bucket',     icon: '🗑️', name: 'Pozinkovaná nádoba',             steps: ['cut','roll','weld','plate'],               q: [6,16],  work: 3,   mat: 14,  price: 55,  rep: 12,  g: 2 },
+  { id: 'galvbox',    icon: '🧰', name: 'Pozinkovaná krabice',            steps: ['cut','bend','fit','plate'],                q: [6,16],  work: 3,   mat: 12,  price: 52,  rep: 15,  g: 2 },
+  { id: 'cabinet',    icon: '🗄️', name: 'Plechová skříň se zámkem',       steps: ['cut','bend','weld','fit','powder'],        q: [3,8],   work: 6,   mat: 45,  price: 210, rep: 20,  g: 2 },
+  { id: 'panel',      icon: '🪟', name: 'Eloxovaný panel',                steps: ['cut','bend','grind','plate'],              q: [6,16],  work: 3.5, mat: 20,  price: 90,  rep: 25,  g: 2 },
+  { id: 'tank',       icon: '🛢️', name: 'Nádrž s přírubou',               steps: ['cut','roll','bend','weld','fit','wet'],    q: [3,8],   work: 5,   mat: 50,  price: 270, rep: 30,  g: 3 },
+  { id: 'duct',       icon: '💨', name: 'Vzduchotechnické potrubí',       steps: ['cut','roll','bend','weld'],                q: [10,25], work: 4,   mat: 18,  price: 70,  rep: 35,  g: 3 },
+  { id: 'railing',    icon: '🪜', name: 'Nerezové zábradlí',              steps: ['cut','roll','weld','grind'],               q: [8,20],  work: 5,   mat: 40,  price: 150, rep: 45,  g: 3 },
+  { id: 'body',       icon: '🚘', name: 'Díl karoserie',                  steps: ['cut','bend','weld','fit','wet'],           q: [20,50], work: 6,   mat: 60,  price: 260, rep: 60,  g: 4 },
+  { id: 'encl',       icon: '🔌', name: 'Skříň pro elektroniku IP65',     steps: ['cut','bend','weld','fit','grind','powder'],q: [20,60], work: 8,   mat: 110, price: 520, rep: 100, g: 6 }
+];
+const PROD = Object.fromEntries(PRODUCTS.map(p => [p.id, p]));
+
+const UPGRADES = [
+  { id: 'click',    name: 'Lepší nářadí',          desc: '+1 k ruční práci za klepnutí',                         max: 20, cost: l => Math.round(60 * Math.pow(1.9, l)) },
+  { id: 'slots',    name: 'Větší dílna',           desc: '+1 zakázka zpracovávaná současně',                     max: 6,  cost: l => Math.round(400 * Math.pow(3, l)) },
+  { id: 'sales',    name: 'Obchodní zástupce',     desc: 'Víc poptávek a rychlejší příliv nových',               max: 5,  cost: l => Math.round(300 * Math.pow(2.8, l)) },
+  { id: 'supplier', name: 'Dodavatel plechu',      desc: 'Materiál o 5 % levnější',                              max: 8,  cost: l => Math.round(500 * Math.pow(2.4, l)) },
+  { id: 'eff',      name: 'Štíhlá výroba',         desc: 'Všechny stroje o 10 % rychlejší',                      max: 15, cost: l => Math.round(1200 * Math.pow(2.2, l)) },
+  { id: 'dispatch', name: 'Automatický dispečer',  desc: 'Sám přijímá nejvýhodnější zakázky, i když jste pryč',  max: 1,  cost: () => 3000 }
+];
+
+/* ===================== PRACOVNÍCI ===================== */
+/* Každý stroj potřebuje obsluhu. Pracovník se přiřazuje ke konkrétnímu stroji;
+   stanice = stroj + člověk, jedna stanice zpracovává jednu zakázku. Mzda se platí jen za odpracovaný čas
+   a strhává se z odměny zakázky (nepotřebujete kapitál).
+   speed = násobek rychlosti stroje, wage = Kč za sekundu práce, hire = cena za najmutí. */
+const WORKER = {
+  fast: { icon: '🧑‍🔧', name: 'Zkušený mistr',      desc: 'Rychlý, ale drahý',     speed: 1.6, wage: 0.6,  hire: 700 },
+  norm: { icon: '👷',   name: 'Vyučený pracovník', desc: 'Normální rychlost i mzda', speed: 1,   wage: 0.25, hire: 250 },
+  slow: { icon: '🧑‍🎓', name: 'Brigádník',          desc: 'Pomalý, ale levný',     speed: 0.6, wage: 0.1,  hire: 100 }
+};
+const WORKER_ORDER = ['fast', 'norm', 'slow'];
+const NAMES = ['Honza', 'Petr', 'Tomáš', 'Jakub', 'Martin', 'Lukáš', 'Pavel', 'Michal', 'David', 'Ondra',
+               'Jana', 'Eva', 'Lenka', 'Petra', 'Kateřina', 'Lucie', 'Tereza', 'Marek', 'Filip', 'Radek'];
+const randName = () => NAMES[Math.floor(Math.random() * NAMES.length)];
+
+/* Třída stroje: 0 = ruční nářadí, 1 = střední stroj, 2 = CNC / linka. Určuje, jak moc
+   záleží na zkušenosti obsluhy a kolik místa stroj zabere v hale. */
+{
+  const seen = {};
+  for (const m of MACHINES) { seen[m.step] = seen[m.step] === undefined ? 0 : seen[m.step] + 1; m.tier = seen[m.step]; }
+}
+/* Výkon stanice = výkon stroje × (rychlost pracovníka ^ vliv obsluhy).
+   Na ručním nářadí je vliv obsluhy menší (nářadí limituje), na CNC je velký:
+   mistr ho využije naplno, brigádník ho zdaleka nevytěží. */
+const TIER_INFL = [0.6, 1, 1.3];
+const workerFactor = (w, m) => Math.pow(WORKER[w.tier].speed, TIER_INFL[m.tier]);
+
+/* ===================== SÍDLO A HALA ===================== */
+const FOOTPRINT = [4, 15, 45];                 // m² podle třídy stroje
+const HALLS = [
+  { name: 'Pronajatá garáž',    area: 30,   rep: 0,   cost: 0 },
+  { name: 'Malá dílna',         area: 80,   rep: 5,   cost: 2500 },
+  { name: 'Dílenská hala',      area: 200,  rep: 20,  cost: 12000 },
+  { name: 'Výrobní hala',       area: 450,  rep: 45,  cost: 50000 },
+  { name: 'Velká hala',         area: 900,  rep: 90,  cost: 200000 },
+  { name: 'Průmyslový areál',   area: 1600, rep: 160, cost: 800000 }
+];
+
+/* ===================== TECHNOLOGIE FIRMY ===================== */
+/* Firma začíná jen s řemeslem podle startu. Další technologii (operaci) lze odemknout
+   při dostatečné reputaci za peníze. Index = počet už odemčených technologií. */
+const TECH_LEVELS = [null, { rep: 5, cost: 1500 }, { rep: 15, cost: 5000 }, { rep: 30, cost: 15000 }, { rep: 50, cost: 40000 },
+                      { rep: 80, cost: 100000 }, { rep: 120, cost: 250000 }, { rep: 170, cost: 600000 }, { rep: 230, cost: 1500000 }];
+const RANKS = [[0, 'Začínající dílna'], [10, 'Malá firma'], [30, 'Zavedená firma'],
+               [70, 'Regionální výrobce'], [150, 'Průmyslový podnik']];
+const techCount = () => STEP_ORDER.filter(s => G.techs[s]).length;
+const nextTech = () => TECH_LEVELS[techCount()] || null;     // null = vše odemčeno
+const rankName = () => RANKS.filter(r => G.rep >= r[0]).pop()[1];
+
+/* ===================== KOOPERACE ===================== */
+/* Kroky, na které nevlastníte stroj, zpracuje dodavatel. Variantu volíte při
+   přijetí zakázky a cena se strhne z odměny až po dokončení (nepotřebujete kapitál).
+   cost = podíl na zisku zakázky, t = násobek doby. */
+const COOP = {
+  fast: { icon: '🚀', name: 'Rychle – draze',          t: 0.35, c: 1.8 },
+  norm: { icon: '🚚', name: 'Normálně – střední cena', t: 1,    c: 1 },
+  slow: { icon: '🐢', name: 'Pomalu – levně',          t: 2,    c: 0.55 }
+};
+let planOid = null;      // zakázka na nabídce, u které právě volíte kooperace
+let planSel = {};        // krok -> zvolená varianta
+
+const orderMatBase = o => (o.matBase != null ? o.matBase : o.qty * PROD[o.pid].mat);
+function coopQuote(o, optId) {
+  const n = PROD[o.pid].steps.length;
+  const profit = Math.max(10, o.reward - orderMatBase(o));
+  const c = COOP[optId];
+  return {
+    cost: Math.max(5, Math.ceil(profit / n * 0.45 * c.c)),
+    time: Math.round((15 + o.work * 1.5) * c.t)
+  };
+}
+const needSteps = o => PROD[o.pid].steps.filter(s => stationCount(s) === 0);   // kroky bez obsazené stanice (stroj + člověk)
+function planDefault(o) { const pl = {}; for (const s of needSteps(o)) pl[s] = 'norm'; return pl; }
+function planTotal(o, plan) {
+  let cost = 0, time = 0;
+  for (const s of needSteps(o)) {
+    if (plan[s] === 'self') continue;               // vlastními silami = zdarma
+    const q = coopQuote(o, plan[s] || 'norm'); cost += q.cost; time += q.time;
+  }
+  return { cost, time };
+}
+const isPending = o => !o.coop && !o.done && !!o.steps[o.step] && stationCount(o.steps[o.step]) === 0 &&
+  !(o.plan && o.plan[o.steps[o.step]] === 'self' && machineUnits(o.steps[o.step]) > 0);
+function startCoop(o, optId) {
+  const q = coopQuote(o, optId);
+  o.coopCost = (o.coopCost || 0) + q.cost;       // strhne se z odměny při dokončení
+  o.coop = { opt: optId, left: q.time, total: q.time };
+}
+function autoCoop() {            // zakázka došla ke kroku bez stroje -> použije se zvolený plán
+  for (const o of G.active) {
+    if (isPending(o)) startCoop(o, (o.plan && o.plan[o.steps[o.step]]) || 'norm');
+  }
+}
+function openPlan(oid) {
+  const o = G.orders.find(x => x.id == oid);
+  if (!o) return;
+  planOid = o.id; planSel = planDefault(o); buildModal();
+}
+let confirmCb = null;
+function closeCoop() { planOid = null; confirmCb = null; $('#modal').hidden = true; }
+function askConfirm(text, yesLabel, cb) {
+  confirmCb = cb;
+  $('#modal').hidden = false;
+  $('#modal').innerHTML = `<div class="mbox"><h3>Potvrdit</h3><div class="small">${esc(text)}</div>
+    <button class="btn full danger" data-act="confyes">${esc(yesLabel)}</button>
+    <button class="btn full ghost" data-act="coopclose">Zrušit</button></div>`;
+}
+function modalCheck() { if (planOid != null && !G.orders.find(x => x.id == planOid)) closeCoop(); }
+function buildModal() {
+  const o = G.orders.find(x => x.id == planOid);
+  if (!o) { closeCoop(); return; }
+  const p = PROD[o.pid], steps = needSteps(o), t = planTotal(o, planSel);
+  const net = o.reward - orderCost(o) - t.cost;
+  $('#modal').hidden = false;
+  $('#modal').innerHTML = `<div class="mbox">
+    <h3>🤝 Kooperace</h3>
+    <div class="small">${p.icon} ${p.name} ×${o.qty}: pro tyto kroky nemáte obsazenou stanici (stroj + člověk).
+      Zvolte dodavatele, cena se strhne z odměny až po dokončení.</div>
+    ${steps.map(s => `<div style="margin-top:12px"><b>${STEPS[s].icon} ${STEPS[s].name}</b>
+      ${Object.entries(COOP).map(([id, c]) => {
+        const q = coopQuote(o, id), on = planSel[s] === id;
+        return `<button class="card pick opt${on ? ' sel' : ''}" data-act="plan" data-step="${s}" data-opt="${id}">
+          <b>${on ? '●' : '○'} ${c.icon} ${c.name}</b><span>Doba ${fmtTime(q.time)}</span><em>−${fmt(q.cost)} Kč z odměny</em></button>`;
+      }).join('')}
+      ${machineUnits(s) > 0 ? `<button class="card pick opt${planSel[s] === 'self' ? ' sel' : ''}" data-act="plan" data-step="${s}" data-opt="self">
+          <b>${planSel[s] === 'self' ? '●' : '○'} 🙋 Vlastními silami</b>
+          <span>Zpracujete ručně klikáním, nebo až se uvolní obsluha</span><em>0 Kč</em></button>` : ''}</div>`).join('')}
+    <div class="small" style="margin-top:12px">Odměna ${fmt(o.reward)} − materiál ${fmt(orderCost(o))} −
+      kooperace ${fmt(t.cost)} = <b>čistý zisk ${fmt(net)} Kč</b>
+      <br>(ještě se odečtou mzdy vlastních lidí za odpracovaný čas)</div>
+    <button class="btn full" data-act="planok">Přijmout zakázku</button>
+    <button class="btn full ghost" data-act="coopclose">Zrušit</button>
+  </div>`;
+}
+
+/* ===================== CLOUD (zatím jen zástupka) ===================== */
+/* Sem se později zapojí Supabase – viz supabase-schema.sql a README.md.
+   Hra běží dál lokálně, tyto metody se budou volat navíc. */
+const Cloud = {
+  enabled: false,
+  async signIn(email, password) { throw new Error('Cloud zatím není připojen'); },
+  async saveGame(state) { /* upsert do tabulky saves */ },
+  async loadGame() { return null; },
+  async listOffers(itemId) { return []; },
+  async createOffer(itemId, qty, unitPrice) {},
+  async buyOffer(offerId, qty) {}
+};
+
+/* ===================== STAV ===================== */
+let G = null;          // stav hry
+let START = null;      // definice zvoleného startu
+let curTab = 'orders';
+let viewSig = '';
+let quiet = false;
+
+const $ = s => document.querySelector(s);
+const view = $('#view');
+
+function newState(startId, name) {
+  const st = STARTS[startId];
+  return {
+    v: 3, start: startId, name: name || 'Moje dílna',
+    money: st.money, rep: 0, totalEarned: 0, done: 0, failed: 0,
+    machines: Object.assign({}, st.machines), upg: {},
+    techs: Object.fromEntries((st.techs || STEP_ORDER).map(t => [t, true])),
+    orders: [], active: [], nextOrderId: 1, spawnTimer: 0,
+    hall: 0,
+    workers: [{ id: 1, name: randName(), tier: 'norm', mid: st.worker || null }], nextWorkerId: 2,
+    last: Date.now(), playTime: 0, created: Date.now()
+  };
+}
+function sanitize(s) {
+  if (!s || typeof s !== 'object' || s.v !== 3 || !STARTS[s.start]) return null;   // starší verze nejsou kompatibilní
+  const d = newState(s.start, String(s.name || '').slice(0, 24));
+  Object.assign(d, s);
+  d.machines = Object.assign({}, s.machines);
+  d.upg = Object.assign({}, s.upg);
+  // starší uložené hry měly všechny technologie
+  d.techs = s.techs ? Object.assign({}, s.techs) : Object.fromEntries(STEP_ORDER.map(t => [t, true]));
+  if (!Array.isArray(d.orders)) d.orders = [];
+  if (!Array.isArray(d.active)) d.active = [];
+  if (!Array.isArray(d.workers)) d.workers = [];
+  d.workers = d.workers.filter(w => w && WORKER[w.tier]).map(w => ({ id: w.id, name: String(w.name || '').slice(0, 20), tier: w.tier, mid: MACH[w.mid] ? w.mid : null }));
+  d.hall = Math.min(Math.max(0, d.hall | 0), HALLS.length - 1);
+  fixAssignments(d);
+  if (!(d.nextWorkerId > 0)) d.nextWorkerId = 1 + d.workers.reduce((m, w) => Math.max(m, w.id || 0), 0);
+  if (![d.money, d.rep, d.last].every(Number.isFinite)) return null;
+  return d;
+}
+function save() {
+  if (!G) return;
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(G)); } catch (e) { /* plné úložiště apod. */ }
+}
+function load() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    return raw ? sanitize(JSON.parse(raw)) : null;
+  } catch (e) { return null; }
+}
+
+/* ===================== VÝPOČTY ===================== */
+const perk = () => START.perk;
+const clickPower = () => 1 + (G.upg.click || 0);
+const slots = () => 2 + (G.upg.slots || 0);
+const boardSize = () => 4 + (G.upg.sales || 0);
+const spawnInterval = () => Math.max(8, 25 - 3 * (G.upg.sales || 0));
+const matMult = () => (perk().mat || 1) * Math.pow(0.95, G.upg.supplier || 0);
+const speedMult = step => (1 + 0.1 * (G.upg.eff || 0)) * ((perk().speed && perk().speed[step]) || 1);
+const machineRate = m => m.rate * speedMult(m.step);
+const machineUnits = step => !G.techs[step] ? 0 : MACHINES.reduce((n, m) => n + (m.step === step ? (G.machines[m.id] || 0) : 0), 0);
+// stanice = stroj s přiřazeným pracovníkem; nejrychlejší první (dostanou nejstarší zakázky)
+function stationList(step) {
+  if (!G.techs[step]) return [];
+  const out = [], sm = speedMult(step);
+  for (const m of MACHINES) {
+    if (m.step !== step) continue;
+    const units = G.machines[m.id] || 0;
+    if (!units) continue;
+    const ws = G.workers.filter(w => w.mid === m.id)
+      .sort((x, y) => workerFactor(y, m) - workerFactor(x, m)).slice(0, units);
+    for (const w of ws) out.push({ rate: m.rate * sm * workerFactor(w, m), wage: WORKER[w.tier].wage });
+  }
+  return out.sort((x, y) => y.rate - x.rate);
+}
+const stationCount = step => stationList(step).length;
+const stepRate = step => stationList(step).reduce((r, s) => r + s.rate, 0);
+const assignedTo = (mid, exceptId) => G.workers.filter(w => w.mid === mid && w.id !== exceptId).length;
+const freeSlots = (mid, exceptId) => (G.machines[mid] || 0) - assignedTo(mid, exceptId);
+function fixAssignments(g) {                   // pracovníci navíc (např. po prodeji stroje) zůstanou bez stroje
+  for (const m of MACHINES) {
+    const units = g.machines[m.id] || 0;
+    g.workers.filter(w => w.mid === m.id)
+      .sort((x, y) => workerFactor(y, m) - workerFactor(x, m)).slice(units).forEach(w => { w.mid = null; });
+  }
+}
+function bestMachineForHire() {                // nejlepší stroj, který ještě nemá obsluhu
+  let best = null;
+  for (const m of MACHINES) {
+    if (!G.techs[m.step] || freeSlots(m.id) <= 0) continue;
+    if (!best || m.rate > best.rate) best = m;
+  }
+  return best ? best.id : null;
+}
+const bestWorkerWithoutMachine = () => G.workers.filter(w => !w.mid)
+  .sort((x, y) => WORKER[y.tier].speed - WORKER[x.tier].speed)[0] || null;
+const spaceUsed = () => MACHINES.reduce((n, m) => n + (G.machines[m.id] || 0) * FOOTPRINT[m.tier], 0);
+const hallCap = () => HALLS[G.hall].area;
+const spaceFree = () => hallCap() - spaceUsed();
+const sellValue = m => Math.floor(0.5 * Math.ceil(m.price * Math.pow(1.15, Math.max(0, (G.machines[m.id] || 1) - 1))));
+const hireCost = tier => Math.ceil(WORKER[tier].hire * Math.pow(1.3, G.workers.length));
+const machineCost = m => Math.ceil(m.price * Math.pow(1.15, G.machines[m.id] || 0));
+const orderCost = o => Math.ceil(o.matBase * matMult());
+const rand = (a, b) => a + Math.random() * (b - a);
+
+function fmt(n) {
+  n = Math.floor(n);
+  if (n < 10000) return n.toLocaleString('cs-CZ');
+  const u = [[1e12, ' bil.'], [1e9, ' mld.'], [1e6, ' mil.'], [1e3, ' tis.']];
+  for (const [v, s] of u) if (n >= v) return (n / v).toFixed(n / v < 100 ? 2 : 1).replace('.', ',') + s;
+  return String(n);
+}
+const pad = n => String(n).padStart(2, '0');
+function fmtTime(s) {
+  s = Math.max(0, Math.ceil(s));
+  const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60;
+  return h ? `${h}:${pad(m)}:${pad(x)}` : `${m}:${pad(x)}`;
+}
+function fmtDur(s) {
+  const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60);
+  return h ? `${h} h ${m} min` : `${m} min`;
+}
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+function toast(msg, bad) {
+  if (quiet) return;
+  const el = document.createElement('div');
+  el.textContent = msg;
+  if (bad) el.className = 'bad';
+  $('#toast').appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}
+
+/* ===================== ZAKÁZKY ===================== */
+function genOrder() {
+  const avail = PRODUCTS.filter(p => p.rep <= G.rep);
+  // vyšší tiery mají o něco větší šanci
+  const weights = avail.map((p, i) => {
+    const own = p.steps.filter(st => G.techs[st]).length / p.steps.length;   // podíl vlastních operací
+    return (1 + i * 0.15) * (0.3 + 2.7 * own);
+  });
+  let r = Math.random() * weights.reduce((a, b) => a + b, 0), idx = 0;
+  for (; idx < weights.length - 1; idx++) { r -= weights[idx]; if (r <= 0) break; }
+  const p = avail[idx];
+  const qty = Math.round(rand(p.q[0], p.q[1]));
+  const work = qty * p.work;
+  const totalWork = work * p.steps.length;
+  return {
+    id: G.nextOrderId++, pid: p.id, qty, work,
+    matBase: qty * p.mat,
+    reward: Math.round(qty * p.price * rand(0.9, 1.15)),
+    deadline: Math.round(90 + totalWork * 4)
+  };
+}
+function fillBoard() { while (G.orders.length < boardSize()) G.orders.push(genOrder()); }
+function spawnOrder() {
+  G.orders.push(genOrder());
+  while (G.orders.length > boardSize()) G.orders.shift();
+}
+function acceptOrder(o, plan) {
+  if (G.active.length >= slots()) return false;
+  const c = orderCost(o);
+  if (G.money < c) return false;                  // předem se platí jen materiál
+  G.money -= c;
+  G.orders = G.orders.filter(x => x !== o);
+  const p = PROD[o.pid];
+  G.active.push({ id: o.id, pid: o.pid, qty: o.qty, work: o.work, reward: o.reward, matBase: o.matBase,
+                  left: o.deadline, steps: p.steps, step: 0, prog: 0, done: false,
+                  coop: null, coopCost: 0, wageCost: 0, plan: plan || planDefault(o) });
+  return true;
+}
+function finishOrder(o) {
+  G.active = G.active.filter(x => x !== o);
+  const cc = o.coopCost || 0, wc = o.wageCost || 0;
+  const net = Math.max(0, o.reward - cc - wc);    // kooperace a mzdy se strhávají z odměny
+  G.money += net;
+  G.totalEarned += net;
+  G.done++;
+  G.rep += PROD[o.pid].g * (perk().rep || 1);
+  toast(`✅ ${PROD[o.pid].name} ×${o.qty} hotovo: +${fmt(net)} Kč` +
+        (cc || wc ? ` (kooperace −${fmt(cc)}, mzdy −${fmt(wc)})` : ''));
+}
+function failOrder(o) {
+  G.active = G.active.filter(x => x !== o);
+  G.failed++;
+  G.rep = Math.max(0, G.rep - 3);
+  toast(`⏰ Zakázka ${PROD[o.pid].name} propadla (−3 reputace)`, true);
+}
+function applyWork(o, amt) {
+  const need = o.work - o.prog;
+  if (amt >= need) {
+    o.prog = 0; o.step++;
+    if (o.step >= o.steps.length) o.done = true;
+    return amt - need;
+  }
+  o.prog += amt;
+  return 0;
+}
+function autoAccept() {
+  while (G.active.length < slots()) {
+    let best = null, bestScore = 0;
+    for (const o of G.orders) {
+      const c = orderCost(o);
+      if (c > G.money) continue;
+      const score = (o.reward - c - planTotal(o, planDefault(o)).cost) / (o.work * PROD[o.pid].steps.length);
+      if (score > bestScore) { bestScore = score; best = o; }
+    }
+    if (!best || !acceptOrder(best, planDefault(best))) break;
+  }
+}
+
+/* ===================== HERNÍ SMYČKA ===================== */
+function tick(dt, offline) {
+  G.playTime += dt;
+
+  // kooperace: dodavatel pracuje na kroku za nás (běží i offline)
+  for (const o of G.active) {
+    if (!o.coop) continue;
+    o.coop.left -= dt;
+    if (o.coop.left <= 0) {
+      o.coop = null; o.prog = 0; o.step++;
+      if (o.step >= o.steps.length) o.done = true;
+    }
+  }
+  autoCoop();
+
+  // výroba: každá stanice (stroj + člověk) zpracovává jednu zakázku, nejstarší dostanou nejrychlejší
+  for (const st of STEP_ORDER) {
+    const sts = stationList(st);
+    if (!sts.length) continue;
+    const queue = G.active.filter(o => !o.coop && !o.done && o.steps[o.step] === st);
+    const k = Math.min(sts.length, queue.length);
+    for (let i = 0; i < k; i++) {
+      const o = queue[i], s = sts[i];
+      const need = o.work - o.prog;
+      const used = Math.min(dt, need / s.rate);
+      o.wageCost = (o.wageCost || 0) + used * s.wage;
+      applyWork(o, used * s.rate >= need ? need : used * s.rate);
+    }
+  }
+  for (const o of G.active.filter(x => x.done)) finishOrder(o);
+
+  // termíny běží jen při aktivní hře (offline jsou zmrazené)
+  if (!offline) {
+    for (const o of G.active.slice()) {
+      o.left -= dt;
+      if (o.left <= 0) failOrder(o);
+    }
+  }
+
+  if (G.upg.dispatch) autoAccept();
+
+  G.spawnTimer += dt;
+  const iv = spawnInterval();
+  while (G.spawnTimer >= iv) { G.spawnTimer -= iv; spawnOrder(); }
+}
+
+function offlineSim(dt) {
+  dt = Math.min(dt, OFFLINE_CAP);
+  const before = G.money;
+  const n = Math.min(3000, Math.ceil(dt));
+  const h = dt / n;
+  quiet = true;
+  for (let i = 0; i < n; i++) tick(h, true);
+  quiet = false;
+  const gain = G.money - before;
+  if (dt >= 30) toast(`💤 Za ${fmtDur(dt)} nepřítomnosti: ${gain >= 0 ? '+' : ''}${fmt(gain)} Kč`);
+}
+
+function frame() {
+  if (!G) return;
+  const now = Date.now();
+  let dt = (now - G.last) / 1000;
+  G.last = now;
+  if (!(dt > 0)) dt = 0;
+  if (dt > 5) offlineSim(dt); else tick(dt, false);
+  modalCheck();
+  renderHeader();
+  renderView(false);
+}
+
+/* ===================== UI: HLAVIČKA, ZÁLOŽKY ===================== */
+const TABS = [
+  ['orders',   '📋', 'Zakázky'],
+  ['prod',     '⚒️', 'Výroba'],
+  ['machines', '🏭', 'Stroje'],
+  ['workers',  '👷', 'Lidé'],
+  ['company',  '🏢', 'Firma'],
+  ['upgrades', '⬆️', 'Vylepšení'],
+  ['more',     '⚙️', 'Více']
+];
+function buildTabs() {
+  $('#tabs').innerHTML = TABS.map(t =>
+    `<button data-tab="${t[0]}"><span>${t[1]}</span>${t[2]}</button>`).join('');
+  markTab();
+}
+function markTab() {
+  document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === curTab));
+}
+function renderHeader() {
+  $('#hMoney').textContent = fmt(G.money);
+  $('#hRep').textContent = fmt(G.rep);
+  $('#hName').textContent = `${G.name} · ${START.name}`;
+}
+
+/* ===================== UI: PANELY ===================== */
+function panelSig() {
+  if (curTab === 'orders') return G.orders.map(o => o.id).join(',');
+  if (curTab === 'prod') return G.active.map(o => o.id).join(',');
+  return '';
+}
+function renderView(force) {
+  const sig = curTab + '|' + panelSig();
+  if (force || sig !== viewSig) { viewSig = sig; view.innerHTML = build(); }
+  update();
+}
+function build() {
+  switch (curTab) {
+    case 'orders': return buildOrders();
+    case 'prod': return buildProd();
+    case 'machines': return buildMachines();
+    case 'workers': return buildWorkers();
+    case 'company': return buildCompany();
+    case 'upgrades': return buildUpgrades();
+    default: return buildMore();
+  }
+}
+function update() {
+  switch (curTab) {
+    case 'orders': return updateOrders();
+    case 'prod': return updateProd();
+    case 'machines': return updateMachines();
+    case 'workers': return updateWorkers();
+    case 'company': return updateCompany();
+    case 'upgrades': return updateUpgrades();
+    default: return updateMore();
+  }
+}
+const canManual = o => !o.coop && !o.done && !!o.steps[o.step] && machineUnits(o.steps[o.step]) > 0 && !isPending(o);
+const chips = steps => steps.map(s => `<span class="chip">${STEPS[s].icon} ${STEPS[s].name}</span>`).join('');
+
+/* --- Zakázky --- */
+function buildOrders() {
+  let h = `<div class="hint">Rozpracováno: <b data-slots></b></div>`;
+  if (!G.orders.length) h += `<div class="empty">Čekáte na nové poptávky…</div>`;
+  for (const o of G.orders) {
+    const p = PROD[o.pid];
+    h += `<div class="card">
+      <div class="row"><b>${p.icon} ${p.name}</b><span class="tag">×${o.qty}</span></div>
+      <div class="chips">${p.steps.map(s => `<span class="chip">${STEPS[s].icon} ${STEPS[s].name}${stationCount(s) === 0 ? ' 🤝' : ''}</span>`).join('')}</div>
+      <div class="row small">
+        <span>Odměna <b>${fmt(o.reward)} Kč</b></span>
+        <span>Materiál <b>${fmt(orderCost(o))} Kč</b></span>
+        <span>Termín <b>${fmtTime(o.deadline)}</b></span>
+      </div>
+      ${needSteps(o).length ? `<div class="small" style="margin-top:6px">🤝 U kroků bez obsazené stanice (stroj + člověk) zvolíte kooperaci, cena se strhne z odměny</div>` : ''}
+      <button class="btn full" data-act="accept" data-id="${o.id}">Přijmout</button>
+    </div>`;
+  }
+  const next = PRODUCTS.filter(p => p.rep > Math.floor(G.rep)).sort((a, b) => a.rep - b.rep)[0];
+  if (next) h += `<div class="hint">🔒 Další typ zakázek se odemkne při reputaci <b>${next.rep}</b>.</div>`;
+  return h;
+}
+function updateOrders() {
+  const s = view.querySelector('[data-slots]');
+  if (s) s.textContent = `${G.active.length} / ${slots()}`;
+  view.querySelectorAll('[data-act="accept"]').forEach(b => {
+    const o = G.orders.find(x => x.id == b.dataset.id);
+    if (!o) return;
+    const full = G.active.length >= slots();
+    const poor = G.money < orderCost(o);
+    b.disabled = full || poor;
+    const txt = full ? 'Dílna je plná' : poor ? 'Chybí peníze na materiál'
+      : needSteps(o).length ? 'Přijmout a zvolit kooperaci' : 'Přijmout';
+    if (b.textContent !== txt) b.textContent = txt;
+  });
+}
+
+/* --- Výroba --- */
+function buildProd() {
+  let h = `<div class="hint" data-rates></div>`;
+  if (!G.active.length) h += `<div class="empty">Žádná rozpracovaná zakázka.<br>Vyberte nějakou v záložce Zakázky.</div>`;
+  for (const o of G.active) {
+    const p = PROD[o.pid];
+    h += `<div class="card" data-aid="${o.id}">
+      <div class="row"><b>${p.icon} ${p.name}</b><span class="tag">×${o.qty}</span></div>
+      <div class="chips">${o.steps.map((s, i) => `<span class="chip" data-i="${i}">${STEPS[s].icon} ${STEPS[s].name}</span>`).join('')}</div>
+      <div class="bar"><i data-bar></i></div>
+      <div class="row small">
+        <span data-pct></span>
+        <span>Odměna <b>${fmt(o.reward)} Kč</b></span>
+        <span>Zbývá <b data-left></b></span>
+      </div>
+      <button class="btn work" data-main data-act="work" data-id="${o.id}">⚒ Pracovat</button>
+    </div>`;
+  }
+  return h;
+}
+function updateProd() {
+  const r = view.querySelector('[data-rates]');
+  if (r) {
+    const parts = STEP_ORDER.filter(s => stationCount(s) > 0).map(s => `${STEPS[s].icon} ${stationCount(s)}× (${stepRate(s).toFixed(1)}/s)`);
+    r.innerHTML = `Ruční práce: <b>+${clickPower()}</b> za klepnutí` + (parts.length ? ` · Stanice: <b>${parts.join(' · ')}</b>` : ' · žádná obsazená stanice, najměte lidi');
+  }
+  view.querySelectorAll('[data-aid]').forEach(card => {
+    const o = G.active.find(x => x.id == card.dataset.aid);
+    if (!o) return;
+    const bar = card.querySelector('[data-bar]');
+    const st = o.steps[o.step];
+    const pct = o.coop ? Math.min(100, (1 - o.coop.left / o.coop.total) * 100)
+                       : Math.min(100, o.prog / o.work * 100);
+    bar.style.width = pct + '%';
+    let label;
+    if (!st) label = 'Hotovo';
+    else if (o.coop) label = `🤝 ${STEPS[st].name} u dodavatele: ${fmtTime(o.coop.left)}`;
+    else if (isPending(o)) label = `${STEPS[st].name}: čeká na kooperaci`;
+    else {
+      const sc = stationCount(st);
+      const idx = G.active.filter(x => !x.coop && !x.done && x.steps[x.step] === st).indexOf(o);
+      label = sc === 0 ? `${STEPS[st].name}: ruční práce – ${Math.floor(pct)} %`
+        : idx < sc ? `${STEPS[st].name}: ${Math.floor(pct)} %`
+        : `${STEPS[st].name}: čeká na volnou stanici (${Math.floor(pct)} %)`;
+    }
+    const pctEl = card.querySelector('[data-pct]');
+    if (pctEl.textContent !== label) pctEl.textContent = label;
+    card.querySelector('[data-left]').textContent = fmtTime(o.left);
+    const mb = card.querySelector('[data-main]');
+    let act, txt, dis = false;
+    if (o.coop) { act = 'none'; txt = '🤝 Kooperace běží…'; dis = true; }
+    else if (isPending(o)) { act = 'none'; txt = '🤝 Předávám dodavateli…'; dis = true; }
+    else if (canManual(o)) { act = 'work'; txt = `⚒ Pracovat sám (+${clickPower()})`; }
+    else { act = 'none'; txt = 'Hotovo'; dis = true; }
+    if (mb.dataset.act !== act) mb.dataset.act = act;
+    if (mb.textContent !== txt) mb.textContent = txt;
+    mb.disabled = dis;
+    card.querySelectorAll('.chip').forEach(c => {
+      const i = +c.dataset.i;
+      c.className = 'chip' + (i < o.step ? ' done' : i === o.step ? ' cur' : '');
+    });
+  });
+}
+
+/* --- Stroje --- */
+function buildMachines() {
+  let h = `<div class="card"><b>🏭 Hala</b> <span class="small" data-hall></span>
+      <div class="bar"><i data-hall-bar></i></div></div>
+    <div class="hint">Každý stroj zabere místo v hale. Výkon stanice je <b>stroj × pracovník</b>: pracovníka
+    přiřadíte ke stroji v záložce Lidé. Další kus téhož stroje je o 15 % dražší.</div>`;
+  for (const st of STEP_ORDER) {
+    if (!G.techs[st]) {
+      h += `<h2 class="sec">${STEPS[st].icon} ${STEPS[st].name} 🔒</h2>
+        <div class="card small">Technologii nemáte. Rozšíření firmy najdete v záložce Firma, do té doby kooperujete.</div>`;
+      continue;
+    }
+    h += `<h2 class="sec">${STEPS[st].icon} ${STEPS[st].name} <span class="small" data-sr="${st}"></span></h2>`;
+    for (const m of MACHINES.filter(x => x.step === st)) {
+      h += `<div class="card slim" data-mid="${m.id}">
+        <div><b>${m.name}</b>
+          <div class="small">Výkon za sekundu: <span data-mr></span></div>
+          <div class="small">Zabírá ${FOOTPRINT[m.tier]} m² · vlastníte <b data-own></b>, obsazeno <b data-occ></b></div></div>
+        <div class="btns">
+          <button class="btn" data-act="buy" data-id="${m.id}"></button>
+          <button class="btn ghost" data-act="sell" data-id="${m.id}">Prodat</button>
+        </div>
+      </div>`;
+    }
+  }
+  return h;
+}
+function updateMachines() {
+  const used = spaceUsed(), cap = hallCap();
+  const hl = view.querySelector('[data-hall]');
+  if (hl) hl.textContent = `${HALLS[G.hall].name}: ${used} / ${cap} m²`;
+  const hb = view.querySelector('[data-hall-bar]');
+  if (hb) hb.style.width = Math.min(100, used / cap * 100) + '%';
+  view.querySelectorAll('[data-sr]').forEach(e => { e.textContent = `· strojů ${machineUnits(e.dataset.sr)}, stanic ${stationCount(e.dataset.sr)}, ${stepRate(e.dataset.sr).toFixed(1)}/s`; });
+  view.querySelectorAll('[data-mid]').forEach(card => {
+    const m = MACH[card.dataset.mid];
+    const r = k => (machineRate(m) * Math.pow(WORKER[k].speed, TIER_INFL[m.tier])).toFixed(2);
+    card.querySelector('[data-mr]').textContent = `brigádník ${r('slow')} · vyučený ${r('norm')} · mistr ${r('fast')}`;
+    const own = G.machines[m.id] || 0;
+    card.querySelector('[data-own]').textContent = own;
+    card.querySelector('[data-occ]').textContent = Math.min(own, assignedTo(m.id));
+    const b = card.querySelector('[data-act="buy"]');
+    const c = machineCost(m), noSpace = spaceFree() < FOOTPRINT[m.tier];
+    const txt = noSpace ? 'Plná hala' : `${fmt(c)} Kč`;
+    if (b.textContent !== txt) b.textContent = txt;
+    b.disabled = noSpace || G.money < c;
+    const sb = card.querySelector('[data-act="sell"]');
+    sb.hidden = own === 0;
+    if (own) { const t = `Prodat +${fmt(sellValue(m))}`; if (sb.textContent !== t) sb.textContent = t; }
+  });
+}
+
+/* --- Lidé --- */
+function buildWorkers() {
+  let h = `<div class="hint">Pracovníka přiřadíte ke <b>konkrétnímu stroji</b>. Výkon = stroj × pracovník.
+    Na ručním nářadí je rozdíl mezi lidmi malý, na CNC a linkách rozhoduje zkušenost: mistr stroj naplno využije,
+    brigádník jen zčásti. Stanice zpracovává jednu zakázku, mzda se platí za odpracovaný čas a strhne se z odměny.</div>
+    <h2 class="sec">Stroje a obsluha</h2>`;
+  const owned = MACHINES.filter(m => G.machines[m.id] > 0);
+  if (!owned.length) h += `<div class="empty">Zatím nemáte žádný stroj.</div>`;
+  for (const m of owned) {
+    h += `<div class="card"><b>${STEPS[m.step].icon} ${m.name} ×${G.machines[m.id]}</b><div class="small" data-ms="${m.id}"></div></div>`;
+  }
+  h += `<h2 class="sec">Zaměstnanci (${G.workers.length})</h2>`;
+  if (!G.workers.length) h += `<div class="empty">Nikoho nezaměstnáváte.</div>`;
+  for (const w of G.workers) {
+    const t = WORKER[w.tier];
+    const opts = owned.filter(m => G.techs[m.step] && (freeSlots(m.id, w.id) > 0 || w.mid === m.id))
+      .map(m => `<option value="${m.id}"${w.mid === m.id ? ' selected' : ''}>${STEPS[m.step].icon} ${m.name}</option>`).join('');
+    h += `<div class="card" data-wid="${w.id}">
+      <div class="row"><b>${t.icon} ${esc(w.name)}</b><span class="tag">${t.name}</span></div>
+      <label class="small">Pracuje na stroji
+        <select data-assign="${w.id}"><option value=""${w.mid ? '' : ' selected'}>– nepřidělen –</option>${opts}</select></label>
+      <div class="small" style="margin-top:6px" data-wi></div>
+      <button class="btn danger" style="margin-top:8px" data-act="fire" data-id="${w.id}">Propustit</button>
+    </div>`;
+  }
+  h += `<h2 class="sec">Najmout</h2>`;
+  for (const tier of WORKER_ORDER) {
+    const t = WORKER[tier];
+    h += `<div class="card slim"><div><b>${t.icon} ${t.name}</b>
+      <div class="small">${t.desc} · rychlost ×${t.speed} · mzda ${Math.round(t.wage * 60)} Kč/min práce</div></div>
+      <button class="btn" data-act="hire" data-tier="${tier}"></button></div>`;
+  }
+  return h;
+}
+function updateWorkers() {
+  view.querySelectorAll('[data-ms]').forEach(e => {
+    const m = MACH[e.dataset.ms], units = G.machines[m.id] || 0;
+    const ws = G.workers.filter(w => w.mid === m.id).slice(0, units);
+    const rate = ws.reduce((r, w) => r + machineRate(m) * workerFactor(w, m), 0);
+    e.innerHTML = `Obsazeno <b>${ws.length} / ${units}</b>` + (ws.length ? ` · výkon <b>${rate.toFixed(2)}/s</b>` : ' · bez obsluhy nepracuje');
+  });
+  view.querySelectorAll('[data-wid]').forEach(card => {
+    const w = G.workers.find(x => x.id == card.dataset.wid);
+    const e = card.querySelector('[data-wi]');
+    if (!w || !e) return;
+    const m = w.mid && MACH[w.mid];
+    e.innerHTML = m
+      ? `Výkon <b>×${workerFactor(w, m).toFixed(2)}</b> → <b>${(machineRate(m) * workerFactor(w, m)).toFixed(2)}/s</b> · mzda ${Math.round(WORKER[w.tier].wage * 60)} Kč/min práce`
+      : 'Bez stroje – nepracuje a nestojí nic.';
+  });
+  view.querySelectorAll('[data-act="hire"]').forEach(b => {
+    const c = hireCost(b.dataset.tier);
+    const txt = `${fmt(c)} Kč`;
+    if (b.textContent !== txt) b.textContent = txt;
+    b.disabled = G.money < c;
+  });
+}
+
+/* --- Firma --- */
+function buildCompany() {
+  let h = `<div class="card"><h3>🏢 ${esc(G.name)}</h3>
+      <div class="small">${START.icon} ${START.name} · bonus: ${START.perkText}</div>
+      <div class="row small block" data-cstats></div></div>
+    <h2 class="sec">Sídlo</h2>
+    <div class="card"><b data-hname></b>
+      <div class="small" data-hinfo></div>
+      <div class="bar"><i data-hbar></i></div>
+      ${HALLS[G.hall + 1]
+        ? `<div class="small" style="margin-top:8px">Další: <b>${HALLS[G.hall + 1].name}</b> (${HALLS[G.hall + 1].area} m²) ·
+            reputace ${HALLS[G.hall + 1].rep} · ${fmt(HALLS[G.hall + 1].cost)} Kč</div>
+           <button class="btn full" data-act="hall"></button>`
+        : `<div class="small" style="margin-top:8px">Největší sídlo. Víc se do areálu nevejde.</div>`}
+    </div>
+    <h2 class="sec">Technologie firmy</h2>`;
+  for (const st of STEP_ORDER) {
+    h += `<div class="card slim"><div><b>${STEPS[st].icon} ${STEPS[st].name}</b>
+      <div class="small">${G.techs[st] ? '✅ Odemčeno' : '🔒 Zatím kooperujete'}</div></div></div>`;
+  }
+  const nt = nextTech();
+  h += `<h2 class="sec">Rozšíření firmy</h2>`;
+  if (!nt) {
+    h += `<div class="card small">Máte všechny technologie. Můžete vyrábět celý řetězec vlastními silami.</div>`;
+  } else {
+    h += `<div class="hint">Další technologie vyžaduje reputaci <b>${nt.rep}</b> a <b>${fmt(nt.cost)} Kč</b>.
+      Vybíráte, kterou operaci odemknete.</div>`;
+    for (const st of STEP_ORDER.filter(t => !G.techs[t])) {
+      h += `<div class="card slim"><div><b>${STEPS[st].icon} ${STEPS[st].name}</b>
+        <div class="small">Pak potřebujete místo v hale, stroje a lidi</div></div>
+        <button class="btn" data-act="tech" data-step="${st}"></button></div>`;
+    }
+  }
+  return h;
+}
+function updateCompany() {
+  const s = view.querySelector('[data-cstats]');
+  if (s) {
+    const units = STEP_ORDER.reduce((n, st) => n + machineUnits(st), 0);
+    const stations = STEP_ORDER.reduce((n, st) => n + stationCount(st), 0);
+    const total = G.done + G.failed;
+    s.innerHTML =
+      `Hodnost: <b>${rankName()}</b><br>Reputace: <b>${fmt(G.rep)}</b><br>` +
+      `Dokončené zakázky: <b>${G.done}</b> · propadlé: <b>${G.failed}</b>` +
+      (total ? ` · úspěšnost <b>${Math.round(G.done / total * 100)} %</b>` : '') + `<br>` +
+      `Celkem vyděláno: <b>${fmt(G.totalEarned)} Kč</b>` +
+      (G.done ? ` · průměr na zakázku <b>${fmt(G.totalEarned / G.done)} Kč</b>` : '') + `<br>` +
+      `Sídlo: <b>${HALLS[G.hall].name}</b> · hala <b>${spaceUsed()} / ${hallCap()} m²</b><br>` +
+      `Zaměstnanci: <b>${G.workers.length}</b> · stroje: <b>${units}</b> · stanice: <b>${stations}</b><br>` +
+      `Technologie: <b>${techCount()} / ${STEP_ORDER.length}</b> · čas hry: <b>${fmtDur(G.playTime)}</b>`;
+  }
+  const hn = view.querySelector('[data-hname]');
+  if (hn) {
+    hn.textContent = `🏢 ${HALLS[G.hall].name}`;
+    view.querySelector('[data-hinfo]').textContent = `Hala: ${spaceUsed()} / ${hallCap()} m² obsazeno`;
+    view.querySelector('[data-hbar]').style.width = Math.min(100, spaceUsed() / hallCap() * 100) + '%';
+    const hb = view.querySelector('[data-act="hall"]'), nh = HALLS[G.hall + 1];
+    if (hb && nh) {
+      const low = G.rep < nh.rep, t = low ? `Potřeba ⭐ ${nh.rep}` : `Rozšířit za ${fmt(nh.cost)} Kč`;
+      if (hb.textContent !== t) hb.textContent = t;
+      hb.disabled = low || G.money < nh.cost;
+    }
+  }
+  const nt = nextTech();
+  view.querySelectorAll('[data-act="tech"]').forEach(b => {
+    if (!nt) return;
+    const lowRep = G.rep < nt.rep;
+    const txt = lowRep ? `Potřeba ⭐ ${nt.rep}` : `${fmt(nt.cost)} Kč`;
+    if (b.textContent !== txt) b.textContent = txt;
+    b.disabled = lowRep || G.money < nt.cost;
+  });
+}
+
+/* --- Vylepšení --- */
+function buildUpgrades() {
+  return UPGRADES.map(u => `<div class="card slim" data-uid="${u.id}">
+    <div><b>${u.name}</b><div class="small">${u.desc}</div>
+      <div class="small">Úroveň <b data-lv></b> / ${u.max}</div></div>
+    <button class="btn" data-act="upg" data-id="${u.id}"></button>
+  </div>`).join('');
+}
+function updateUpgrades() {
+  view.querySelectorAll('[data-uid]').forEach(card => {
+    const u = UPGRADES.find(x => x.id === card.dataset.uid);
+    const lv = G.upg[u.id] || 0;
+    card.querySelector('[data-lv]').textContent = lv;
+    const b = card.querySelector('[data-act="upg"]');
+    if (lv >= u.max) { b.textContent = 'Max'; b.disabled = true; return; }
+    const c = u.cost(lv);
+    b.textContent = `${fmt(c)} Kč`;
+    b.disabled = G.money < c;
+  });
+}
+
+/* --- Více --- */
+function buildMore() {
+  return `
+  <div class="card"><h3>Vaše dílna</h3>
+    <div class="small">${esc(G.name)} · ${START.icon} ${START.name}<br>Bonus: ${START.perkText}</div>
+  </div>
+  <div class="card"><h3>🤝 Trh mezi hráči</h3>
+    <div class="small">Připravujeme: hráči budou vyrábět a prodávat si navzájem materiál a nástroje levněji než na běžném trhu.
+    Databáze je navržená v souboru <b>supabase-schema.sql</b>.</div>
+    <button class="btn full ghost" disabled>Otevřít trh (brzy)</button>
+  </div>
+  <div class="card"><h3>👤 Účet a cloudové ukládání</h3>
+    <div class="small">Zatím se postup ukládá jen v tomto prohlížeči. Přihlášení přibude s připojením Supabase.</div>
+    <button class="btn full ghost" disabled>Přihlásit se (brzy)</button>
+  </div>
+  <div class="card"><h3>💾 Záloha postupu</h3>
+    <div class="small">Přenos mezi zařízeními: exportujte text a vložte ho do hry na jiném zařízení.</div>
+    <textarea id="saveBox" placeholder="Sem vložte kód uložené hry…"></textarea>
+    <div class="row" style="margin-top:8px">
+      <button class="btn ghost" data-act="export">Exportovat</button>
+      <button class="btn ghost" data-act="import">Importovat</button>
+      <button class="btn danger" data-act="reset">Nová hra</button>
+    </div>
+  </div>
+  <div class="card"><h3>🧪 Testování</h3>
+    <div class="small">Pomůcky pro zkoušení hry (později je můžeme odebrat).</div>
+    <div class="row" style="margin-top:8px">
+      <button class="btn ghost" data-act="cheatmoney">+10 000 Kč</button>
+      <button class="btn ghost" data-act="cheatrep">+25 ⭐</button>
+      <button class="btn ghost" data-act="cheattech">Všechny technologie</button>
+      <button class="btn ghost" data-act="cheathall">Největší hala</button>
+    </div>
+  </div>`;
+}
+function updateMore() {
+  const s = view.querySelector('[data-stats]');
+  if (s) s.innerHTML =
+    `Dokončené zakázky: <b>${G.done}</b><br>Propadlé zakázky: <b>${G.failed}</b><br>` +
+    `Celkem vyděláno: <b>${fmt(G.totalEarned)} Kč</b><br>Čas hry: <b>${fmtDur(G.playTime)}</b>`;
+}
+
+/* ===================== AKCE ===================== */
+view.addEventListener('click', e => {
+  const b = e.target.closest('[data-act]');
+  if (!b || b.disabled || !G) return;
+  const act = b.dataset.act, id = b.dataset.id;
+
+  if (act === 'accept') {
+    const o = G.orders.find(x => x.id == id);
+    if (!o) return;
+    if (needSteps(o).length) openPlan(o.id);       // nejdřív zvolit kooperace
+    else if (acceptOrder(o)) { toast('📥 Zakázka přijata'); renderView(true); renderHeader(); }
+  } else if (act === 'work') {
+    const o = G.active.find(x => x.id == id);
+    if (o && canManual(o)) { applyWork(o, clickPower()); if (o.done) finishOrder(o); renderView(false); renderHeader(); }
+  } else if (act === 'hire') {
+    const tier = b.dataset.tier, c = hireCost(tier);
+    if (WORKER[tier] && G.money >= c) {
+      G.money -= c;
+      const w = { id: G.nextWorkerId++, name: randName(), tier, mid: bestMachineForHire() };
+      G.workers.push(w);
+      toast(w.mid ? `${WORKER[tier].icon} ${w.name} nastoupil na stroj: ${MACH[w.mid].name}`
+                  : `${WORKER[tier].icon} ${w.name} nastoupil (zatím bez stroje)`);
+      renderView(true); renderHeader();
+    }
+  } else if (act === 'fire') {
+    const w = G.workers.find(x => x.id == id);
+    if (w) askConfirm(`Propustit zaměstnance ${w.name}?`, 'Propustit', () => { G.workers = G.workers.filter(x => x !== w); renderView(true); });
+  } else if (act === 'tech') {
+    const nt = nextTech(), st = b.dataset.step;
+    if (nt && STEPS[st] && !G.techs[st] && G.rep >= nt.rep && G.money >= nt.cost) {
+      G.money -= nt.cost; G.techs[st] = true;
+      toast(`🏢 Firma se rozšířila o technologii: ${STEPS[st].name}`);
+      renderView(true); renderHeader();
+    }
+  } else if (act === 'buy') {
+    const m = MACH[id], c = machineCost(m);
+    if (G.techs[m.step] && G.money >= c && spaceFree() >= FOOTPRINT[m.tier]) {
+      G.money -= c; G.machines[id] = (G.machines[id] || 0) + 1;
+      const free = bestWorkerWithoutMachine();
+      if (free) free.mid = id;                    // volný pracovník rovnou nastoupí na nový stroj
+      renderView(false); renderHeader();
+    } else if (spaceFree() < FOOTPRINT[m.tier]) toast('Hala je plná – rozšiřte sídlo v záložce Firma', true);
+  } else if (act === 'sell') {
+    const m = MACH[id];
+    if (m && G.machines[id] > 0) {
+      askConfirm(`Prodat stroj ${m.name} za ${fmt(sellValue(m))} Kč?`, 'Prodat', () => {
+        if (!(G.machines[id] > 0)) return;
+        G.money += sellValue(m); G.machines[id]--;
+        if (G.machines[id] <= 0) delete G.machines[id];
+        fixAssignments(G); renderView(true); renderHeader();
+      });
+    }
+  } else if (act === 'hall') {
+    const nh = HALLS[G.hall + 1];
+    if (nh && G.rep >= nh.rep && G.money >= nh.cost) {
+      G.money -= nh.cost; G.hall++;
+      toast(`🏢 Nové sídlo: ${nh.name} (${nh.area} m²)`);
+      renderView(true); renderHeader();
+    }
+  } else if (act === 'upg') {
+    const u = UPGRADES.find(x => x.id === id), lv = G.upg[id] || 0;
+    if (lv < u.max && G.money >= u.cost(lv)) { G.money -= u.cost(lv); G.upg[id] = lv + 1; renderView(false); renderHeader(); }
+  } else if (act === 'export') {
+    save();
+    $('#saveBox').value = btoa(unescape(encodeURIComponent(JSON.stringify(G))));
+  } else if (act === 'import') {
+    try {
+      const raw = $('#saveBox').value.trim();
+      const s = sanitize(JSON.parse(decodeURIComponent(escape(atob(raw)))));
+      if (!s) throw new Error('bad');
+      askConfirm('Přepsat aktuální postup importovaným?', 'Přepsat', () => {
+        G = s; START = STARTS[G.start]; G.last = Date.now(); fillBoard(); save();
+        renderHeader(); renderView(true); toast('Postup načten');
+      });
+    } catch (err) { toast('Import se nepovedl – zkontrolujte kód', true); }
+  } else if (act === 'reset') {
+    askConfirm('Opravdu začít novou hru? Veškerý postup se smaže.', 'Začít novou hru', () => {
+      G = null; START = null;                       // aby ho pagehide/interval znovu neuložil
+      try { localStorage.removeItem(SAVE_KEY); } catch (e) {}
+      curTab = 'orders'; viewSig = ''; markTab();
+      view.innerHTML = '';
+      showStart();
+    });
+  } else if (act === 'cheatmoney') {
+    G.money += 10000; renderHeader(); renderView(false);
+  } else if (act === 'cheatrep') {
+    G.rep += 25; renderHeader(); renderView(false);
+  } else if (act === 'cheattech') {
+    for (const st of STEP_ORDER) G.techs[st] = true;
+    renderView(true);
+  } else if (act === 'cheathall') {
+    G.hall = HALLS.length - 1; renderView(true);
+  }
+});
+view.addEventListener('change', e => {
+  const sel = e.target.closest('select[data-assign]');
+  if (!sel || !G) return;
+  const w = G.workers.find(x => x.id == sel.dataset.assign);
+  if (!w) return;
+  const mid = sel.value;
+  if (!mid) w.mid = null;
+  else if (MACH[mid] && G.techs[MACH[mid].step] && freeSlots(mid, w.id) > 0) w.mid = mid;
+  renderView(true);
+});
+$('#modal').addEventListener('click', e => {
+  if (!G) return;
+  if (e.target === $('#modal')) { closeCoop(); return; }
+  const b = e.target.closest('[data-act]');
+  if (!b || b.disabled) return;
+  const act = b.dataset.act;
+  if (act === 'coopclose') {
+    closeCoop();
+  } else if (act === 'confyes') {
+    const cb = confirmCb; closeCoop();
+    if (cb) cb();
+  } else if (act === 'plan') {
+    planSel[b.dataset.step] = b.dataset.opt;
+    buildModal();
+  } else if (act === 'planok') {
+    const o = G.orders.find(x => x.id == planOid);
+    if (o && acceptOrder(o, Object.assign({}, planSel))) {
+      toast('📥 Zakázka přijata'); closeCoop(); renderView(true); renderHeader();
+    } else {
+      toast('Zakázku nelze přijmout (plná dílna nebo chybí peníze)', true);
+    }
+  }
+});
+$('#tabs').addEventListener('click', e => {
+  const b = e.target.closest('button[data-tab]');
+  if (!b || !G) return;
+  curTab = b.dataset.tab; markTab(); renderView(true);
+});
+
+/* ===================== START ===================== */
+function showStart() {
+  const el = $('#start');
+  el.hidden = false;
+  el.innerHTML = `<div class="start-box">
+    <h1>🏭 Plechárna</h1>
+    <p class="small">Idle hra o výrobě z tenkých plechů. Z malé dílny postavíte továrnu.</p>
+    <label class="small">Název vaší firmy
+      <input type="text" id="nameInput" maxlength="24" placeholder="Např. Plechy Novák"></label>
+    <h3>Čím chcete začít?</h3>
+    ${Object.entries(STARTS).map(([id, s]) => `
+      <button class="card pick" data-start="${id}">
+        <b>${s.icon} ${s.name}</b><span>${s.desc}</span>
+        <em>${s.perkText} · start ${s.money} Kč</em>
+      </button>`).join('')}
+  </div>`;
+}
+$('#start').addEventListener('click', e => {
+  const b = e.target.closest('[data-start]');
+  if (!b) return;
+  const name = ($('#nameInput').value || '').trim().slice(0, 24);
+  G = newState(b.dataset.start, name);
+  START = STARTS[G.start];
+  fillBoard();
+  $('#start').hidden = true;
+  save(); renderHeader(); renderView(true);
+});
+
+function init() {
+  buildTabs();
+  G = load();
+  if (G) {
+    START = STARTS[G.start];
+    fillBoard();
+    renderHeader(); renderView(true);
+    frame();               // dopočítá offline postup
+  } else {
+    showStart();
+  }
+  setInterval(frame, 200);
+  setInterval(save, 5000);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) save(); else frame(); });
+  window.addEventListener('pagehide', save);
+}
+init();
+</script>
+</body>
+</html>
