@@ -1540,6 +1540,10 @@ function buildMore() {
       <button class="btn danger" data-act="reset">Nová hra</button>
     </div>
   </div>
+  <div class="card"><h3>🖼️ Obrázky strojů</h3>
+    <div class="small">Hra hledá soubory ve složce <b>Grafika Stroje</b> vedle index.html. Kontrola ukáže, které se našly.</div>
+    <button class="btn ghost full" data-act="imgcheck">Zkontrolovat obrázky</button>
+    <div class="small" data-imgres style="margin-top:8px"></div></div>
   <div class="card"><h3>🧪 Testování</h3>
     <div class="small">Pomůcky pro zkoušení hry (později je můžeme odebrat).</div>
     <div class="row" style="margin-top:8px">
@@ -1699,6 +1703,23 @@ view.addEventListener('click', e => {
   } else if (act === 'cheattech') {
     for (const st of STEP_ORDER) G.techs[st] = true;
     renderView(true);
+  } else if (act === 'imgcheck') {
+    const out = view.querySelector('[data-imgres]');
+    out.textContent = 'Zkouším…';
+    const tryLoad = u => new Promise(r => { const i = new Image(); i.onload = () => r(true); i.onerror = () => r(false); i.src = u; });
+    (async () => {
+      let ok = 0; const miss = [];
+      for (const m of MACHINES) {
+        let found = false;
+        for (const c of imgCandidates(m)) if (await tryLoad(c)) { found = true; break; }
+        if (found) ok++; else miss.push(m.name);
+      }
+      const base = new URL(imgCandidates(MACHINES[0])[0], document.baseURI).href;
+      out.innerHTML = `Nalezeno <b>${ok} / ${MACHINES.length}</b>.` + (miss.length ? `<br>Chybí: ${miss.map(esc).join(', ')}` : '') +
+        `<br>Stránka běží na: <b>${esc(location.protocol + '//' + (location.host || '(soubor)'))}</b><br>Příklad hledané adresy: ${esc(base)}` +
+        (location.protocol === 'file:' ? '<br>⚠ Stránka je otevřená ze souboru, obrázky se načtou jen když jsou vedle něj.' : '');
+      Object.keys(IMG).forEach(k => delete IMG[k]);
+    })();
   } else if (act === 'cheathall') {
     G.hall = HALLS.length - 1; renderView(true);
   }
