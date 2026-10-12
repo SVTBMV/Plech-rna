@@ -11,7 +11,7 @@
 html,body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 button,input,textarea{font:inherit;color:inherit}
 #app{min-height:100dvh;display:flex}
-#col{flex:1;min-width:0;max-width:640px;margin:0 auto;display:flex;flex-direction:column}
+#col{flex:1;min-width:0;max-width:1320px;margin:0 auto;display:flex;flex-direction:column}
 header{position:sticky;top:0;z-index:5;background:var(--bg);padding:10px 14px;padding-top:max(10px,env(safe-area-inset-top));border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:10px}
 .money{font-size:1.35rem;font-weight:700;color:var(--acc)}
 .sub{font-size:.8rem;color:var(--mut)}
@@ -27,6 +27,16 @@ nav button.on{color:var(--acc);border-left-color:var(--acc);background:var(--pan
   nav button{flex-direction:row;gap:10px;justify-content:flex-start;padding:14px 14px;font-size:.92rem}
   nav button span{font-size:1.25rem}
 }
+#view{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;align-content:start}
+#view>*{min-width:0}
+#view>.card{margin-bottom:0;height:100%}
+#view>h2.sec{grid-column:1/-1;margin:10px 2px 0}
+#view>h2.sec:first-child{margin-top:0}
+#view>.hint,#view>.empty,#view>.wide{grid-column:1/-1}
+#view>.hint{margin:0 2px}
+@media(min-width:760px){#view{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(min-width:1100px){#view{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(min-width:760px){main{padding:16px 20px 40px}}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px}
 .card h3{margin:0 0 6px}
 .row{display:flex;justify-content:space-between;align-items:center;gap:8px}
@@ -87,6 +97,7 @@ button.chip{cursor:pointer;min-height:36px;touch-action:manipulation}
 .mt .bdg{position:absolute;right:2px;bottom:2px;font-size:11px;background:#000b;border-radius:4px;padding:0 3px;line-height:1.3}
 .mt.on{border-color:var(--ok)}.mt.off{border-color:var(--bad)}.mt.wh{border-color:#6c7a89;background:#2a2f36}
 .mt.sel{outline:3px solid var(--acc);outline-offset:-1px;z-index:2}
+.hgrid.edit{cursor:crosshair}.hgrid.edit .mt{cursor:grab}
 .zoom{display:flex;gap:6px}.zoom .btn{min-height:34px;padding:4px 12px}
 .est{font-size:.88rem;margin-top:8px;line-height:1.5}
 label.chk{display:flex;gap:10px;align-items:center;padding:8px 0;font-size:.92rem;color:var(--tx)}
@@ -422,6 +433,8 @@ function buildModal() {
     <h3>🤝 Kooperace</h3>
     <div class="small">${p.icon} ${p.name} ×${o.qty}: pro tyto kroky nemáte obsazenou stanici (stroj + člověk).
       Zvolte dodavatele, cena se strhne z odměny až po dokončení.</div>
+    <button class="btn full" data-act="planok" style="margin-top:8px">Přijmout zakázku</button>
+    <button class="btn full ghost" data-act="coopclose">Zrušit</button>
     ${steps.map(s => `<div style="margin-top:12px"><b>${STEPS[s].icon} ${STEPS[s].name}</b>
       ${Object.entries(COOP).map(([id, c]) => {
         const q = coopQuote(o, id), on = planSel[s] === id;
@@ -433,8 +446,6 @@ function buildModal() {
           <span>Zpracujete ručně klikáním, nebo až se uvolní obsluha</span><em>0 Kč</em></button>` : ''}</div>`).join('')}
     <div class="est">Odměna <b>${fmt(o.reward)} Kč</b></div>
     <div class="est" style="margin-top:0">${estHtml(o, planSel)}</div>
-    <button class="btn full" data-act="planok">Přijmout zakázku</button>
-    <button class="btn full ghost" data-act="coopclose">Zrušit</button>
   </div>`;
 }
 
@@ -475,34 +486,45 @@ document.addEventListener('load', e => {
   if (im && im.tagName === 'IMG' && im.dataset.mimg) IMG[im.dataset.mimg] = im.getAttribute('src');
 }, true);
 
+let gridEdit = false, gridSel = null;
 let gridCell = 24;                             // velikost čtverečku (px) v plánu haly
 function hallItems() {
   const items = [], w = WAREHOUSES[G.wh];
-  if (w.area) items.push({ kind: 'wh', w: w.w, h: w.h, area: w.area, ord: -1, idx: 0 });
+  if (w.area) items.push({ kind: 'wh', key: 'wh', w: w.w, h: w.h, area: w.area, ord: -1, idx: 0 });
   MACHINES.forEach((m, mi) => {
     const n = G.machines[m.id] || 0;
-    for (let i = 0; i < n; i++) items.push({ kind: 'm', m, idx: i, w: DIMS[m.tier][0], h: DIMS[m.tier][1], area: FOOTPRINT[m.tier], ord: mi });
+    for (let i = 0; i < n; i++) items.push({ kind: 'm', key: m.id + ':' + i, m, idx: i, w: DIMS[m.tier][0], h: DIMS[m.tier][1], area: FOOTPRINT[m.tier], ord: mi });
   });
   return items.sort((a, b) => b.area - a.area || a.ord - b.ord || a.idx - b.idx);
 }
 /* Automatické rozmístění: největší kusy první, vše na sudých metrech, takže se vejde všechno,
    co se vejde plochou. */
-function packHall(items, W, H) {
+function packHall(items, W, H, layout) {
   const occ = Array.from({ length: H }, () => new Array(W).fill(false));
   const free = (x, y, w, h) => {
+    if (x < 0 || y < 0 || x + w > W || y + h > H) return false;
     for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) if (occ[j][i]) return false;
     return true;
   };
-  const placed = [], failed = [];
-  for (const it of items) {
+  const put = (it, pos) => {
+    for (let j = pos.y; j < pos.y + pos.h; j++) for (let i = pos.x; i < pos.x + pos.w; i++) occ[j][i] = true;
+    placed.push(Object.assign({}, it, pos));
+  };
+  const placed = [], failed = [], rest = [];
+  for (const it of items) {                    // nejdřív kusy s ručně nastavenou polohou
+    const L = layout && layout[it.key];
+    const okDim = L && ((L.w === it.w && L.h === it.h) || (L.w === it.h && L.h === it.w));
+    if (okDim && free(L.x, L.y, L.w, L.h)) put(it, { x: L.x, y: L.y, w: L.w, h: L.h });
+    else rest.push(it);
+  }
+  for (const it of rest) {                     // ostatní automaticky, největší první, na sudých metrech
     let pos = null;
     const dims = it.w === it.h ? [[it.w, it.h]] : [[it.w, it.h], [it.h, it.w]];
     outer: for (const [w, h] of dims)
       for (let y = 0; y + h <= H; y += 2) for (let x = 0; x + w <= W; x += 2)
         if (free(x, y, w, h)) { pos = { x, y, w, h }; break outer; }
     if (!pos) { failed.push(it); continue; }
-    for (let j = pos.y; j < pos.y + pos.h; j++) for (let i = pos.x; i < pos.x + pos.w; i++) occ[j][i] = true;
-    placed.push(Object.assign({}, it, pos));
+    put(it, pos);
   }
   return { placed, failed };
 }
@@ -512,22 +534,52 @@ function unitWorker(m, idx) {                  // pracovník na dané kusu stroj
 }
 function hallGridHtml() {
   const hl = HALLS[G.hall];
-  const { placed, failed } = packHall(hallItems(), hl.w, hl.h);
+  let { placed, failed } = packHall(hallItems(), hl.w, hl.h, G.layout);
+  let reset = false;
+  if (failed.length && Object.keys(G.layout).length) {      // nový kus se do ručního rozmístění nevešel
+    G.layout = {}; reset = true; gridSel = null;
+    ({ placed, failed } = packHall(hallItems(), hl.w, hl.h, G.layout));
+  }
   const tiles = placed.map(p => {
     const st = `grid-column:${p.x + 1} / span ${p.w};grid-row:${p.y + 1} / span ${p.h}`;
-    if (p.kind === 'wh') return `<div class="mt wh" style="${st}" data-act="gridsel" data-kind="wh" title="Sklad"><span class="emo">📦</span></div>`;
+    if (p.kind === 'wh') return `<div class="mt wh${gridSel === 'wh' ? ' sel' : ''}" style="${st}" data-key="wh" data-act="gridsel" data-kind="wh" title="Sklad"><span class="emo">📦</span></div>`;
     const w = unitWorker(p.m, p.idx);
-    return `<div class="mt ${w ? 'on' : 'off'}" style="${st}" data-act="gridsel" data-kind="m" data-mid="${p.m.id}" data-idx="${p.idx}" title="${esc(p.m.name)}">
+    return `<div class="mt ${w ? 'on' : 'off'}${gridSel === p.key ? ' sel' : ''}" style="${st}" data-key="${p.key}" data-act="gridsel" data-kind="m" data-mid="${p.m.id}" data-idx="${p.idx}" title="${esc(p.m.name)}">
       <span class="emo">${STEPS[p.m.step].icon}</span>${imgTag(p.m)}<span class="bdg">${w ? WORKER[w.tier].icon : '⚠'}</span></div>`;
   }).join('');
-  return `<div class="card">
+  return `<div class="card wide">
     <div class="row"><b>Hala ${hl.w} × ${hl.h} m</b><span class="zoom">
+      <button class="btn ${gridEdit ? '' : 'ghost'}" data-act="gridedit">${gridEdit ? '✔ Hotovo' : '✏️ Upravit'}</button>
       <button class="btn ghost" data-act="gridzoom" data-d="-1">−</button><button class="btn ghost" data-act="gridzoom" data-d="1">+</button></span></div>
-    <div class="small">Čtvereček = 1 m². Zelený rámeček: stroj má obsluhu, červený ⚠: stojí. Klepnutím na stroj zobrazíte detail.</div>
-    <div class="hall"><div class="hgrid" style="--W:${hl.w};--H:${hl.h};--c:${gridCell}px">${tiles}</div></div>
+    <div class="small">Čtvereček = 1 m². Zelený rámeček: stroj má obsluhu, červený ⚠: stojí. ${gridEdit ? 'Úprava: klepněte na stroj a potom na místo v hale, kam ho přesunout.' : 'Klepnutím na stroj zobrazíte detail.'}</div>
+    ${gridEdit ? `<div class="chips"><button class="chip" data-act="gridrot">🔄 Otočit</button><button class="chip" data-act="gridauto">🧹 Přeskládat automaticky</button></div>` : ''}
+    <div class="hall"><div class="hgrid${gridEdit ? ' edit' : ''}" data-act="gridcell" style="--W:${hl.w};--H:${hl.h};--c:${gridCell}px">${tiles}</div></div>
     <div class="small" style="margin-top:8px" data-ginfo>Obsazeno ${spaceUsed()} z ${hl.area} m².</div>
+    ${reset ? '<div class="small">Nový kus se do ručního rozmístění nevešel, hala se přeskládala automaticky.</div>' : ''}
     ${failed.length ? `<div class="small neg">⚠ ${failed.length} ks se do plánu nevešlo.</div>` : ''}
   </div>`;
+}
+function rebuildHall() {
+  const h = view.querySelector('.hall'), sl = h ? h.scrollLeft : 0, st = h ? h.scrollTop : 0;
+  renderView(true);
+  const n = view.querySelector('.hall'); if (n) { n.scrollLeft = sl; n.scrollTop = st; }
+}
+/* Přesun (nebo otočení, když t == null) vybraného kusu. Při první úpravě se současné rozmístění zamkne. */
+function moveSel(t) {
+  const hl = HALLS[G.hall];
+  const { placed } = packHall(hallItems(), hl.w, hl.h, G.layout);
+  const cur = placed.find(p => p.key === gridSel);
+  if (!cur) { toast('Nejdřív klepněte na stroj', true); return; }
+  let w = cur.w, h = cur.h, x = cur.x, y = cur.y;
+  if (t) { x = Math.min(hl.w - w, Math.max(0, t.cx - Math.floor(w / 2))); y = Math.min(hl.h - h, Math.max(0, t.cy - Math.floor(h / 2))); }
+  else { if (w === h) { toast('Čtvercový stroj se otáčet nemusí'); return; } [w, h] = [h, w]; }
+  if (x < 0 || y < 0 || x + w > hl.w || y + h > hl.h ||
+      placed.some(p => p !== cur && x < p.x + p.w && p.x < x + w && y < p.y + p.h && p.y < y + h)) { toast('Tam se to nevejde', true); return; }
+  const lay = {};
+  for (const p of placed) lay[p.key] = { x: p.x, y: p.y, w: p.w, h: p.h };
+  lay[gridSel] = { x, y, w, h };
+  G.layout = lay;
+  rebuildHall();
 }
 function gridInfo(el) {
   if (el.dataset.kind === 'wh') {
@@ -558,7 +610,7 @@ function newState(startId, name) {
     machines: Object.assign({}, st.machines), upg: {},
     techs: Object.fromEntries((st.techs || STEP_ORDER).map(t => [t, true])),
     orders: [], active: [], nextOrderId: 1, spawnTimer: 0,
-    hall: 0, wh: 0, stock: 0, autoStock: 0, scrapped: 0,
+    hall: 0, wh: 0, layout: {}, stock: 0, autoStock: 0, scrapped: 0,
     staff: { dispatcher: null, storekeeper: null, technologist: null },
     disp: defaultDisp(), dispTimer: 0, stockTimer: 0,
     workers: [{ id: 1, name: randName(), tier: 'norm', mid: st.worker || null }], nextWorkerId: 2,
@@ -592,6 +644,12 @@ function sanitize(s) {
   if (!COOP_POLICY[d.disp.coop]) d.disp.coop = 'norm';
   d.disp.margin = Math.min(100, Math.max(0, +d.disp.margin || 0));
   d.scrapped = +d.scrapped || 0;
+  const lay = {};
+  if (s.layout && typeof s.layout === 'object') for (const k of Object.keys(s.layout)) {
+    const L = s.layout[k];
+    if (L && [L.x, L.y, L.w, L.h].every(Number.isInteger) && L.x >= 0 && L.y >= 0 && L.w > 0 && L.h > 0 && L.w <= 32 && L.h <= 32) lay[k] = { x: L.x, y: L.y, w: L.w, h: L.h };
+  }
+  d.layout = lay;
   const used = MACHINES.reduce((n, m) => n + (d.machines[m.id] || 0) * FOOTPRINT[m.tier], 0) + WAREHOUSES[d.wh].area;
   while (used > HALLS[d.hall].area && d.hall < HALLS.length - 1) d.hall++;   // rozměry haly se změnily
   if (!(d.nextWorkerId > 0)) d.nextWorkerId = 1 + d.workers.reduce((m, w) => Math.max(m, w.id || 0), 0);
@@ -960,11 +1018,11 @@ function frame() {
 
 /* ===================== UI: HLAVIČKA, ZÁLOŽKY ===================== */
 const TABS = [
+  ['company',  '🏢', 'Firma'],
   ['orders',   '📋', 'Zakázky'],
   ['prod',     '⚒️', 'Výroba'],
   ['machines', '🏭', 'Stroje'],
   ['workers',  '👷', 'Lidé'],
-  ['company',  '🏢', 'Firma'],
   ['upgrades', '⬆️', 'Vylepšení'],
   ['more',     '⚙️', 'Více']
 ];
@@ -1033,6 +1091,7 @@ function buildOrders() {
     const p = PROD[o.pid];
     h += `<div class="card" data-oid="${o.id}">
       <div class="row"><b>${p.icon} ${p.name}</b><span class="tag">×${o.qty}</span></div>
+      <button class="btn full" style="margin:6px 0" data-act="accept" data-id="${o.id}">Přijmout</button>
       <div class="chips">${p.steps.map(s => `<span class="chip">${STEPS[s].icon} ${STEPS[s].name}${stationCount(s) === 0 ? ' 🤝' : ''}</span>`).join('')}</div>
       <div class="row small">
         <span>Odměna <b>${fmt(o.reward)} Kč</b></span>
@@ -1040,7 +1099,6 @@ function buildOrders() {
       </div>
       <div class="est" data-est></div>
       ${needSteps(o).length ? `<div class="small" style="margin-top:6px">🤝 U kroků bez obsazené stanice (stroj + člověk) zvolíte kooperaci, odhad počítá s normální.</div>` : ''}
-      <button class="btn full" data-act="accept" data-id="${o.id}">Přijmout</button>
     </div>`;
   }
   const next = PRODUCTS.filter(p => p.rep > Math.floor(G.rep)).sort((a, b) => a.rep - b.rep)[0];
@@ -1140,14 +1198,14 @@ function updateProd() {
 
 /* --- Stroje --- */
 function buildMachines() {
-  let h = `<div class="card"><b>🏭 Hala</b> <span class="small" data-hall></span>
+  let h = `<div class="card wide"><b>🏭 Hala</b> <span class="small" data-hall></span>
       <div class="bar"><i data-hall-bar></i></div></div>
     <div class="hint">Každý stroj zabere místo v hale. Výkon stanice je <b>stroj × pracovník</b>: pracovníka
     přiřadíte ke stroji v záložce Lidé. Další kus téhož stroje je o 15 % dražší.</div>`;
   for (const st of STEP_ORDER) {
     if (!G.techs[st]) {
       h += `<h2 class="sec">${STEPS[st].icon} ${STEPS[st].name} 🔒</h2>
-        <div class="card small">Technologii nemáte. Rozšíření firmy najdete v záložce Firma, do té doby kooperujete.</div>`;
+        <div class="card small wide">Technologii nemáte. Rozšíření firmy najdete v záložce Firma, do té doby kooperujete.</div>`;
       continue;
     }
     h += `<h2 class="sec">${STEPS[st].icon} ${STEPS[st].name} <span class="small" data-sr="${st}"></span></h2>`;
@@ -1213,12 +1271,7 @@ function buildWorkers() {
           `<button class="btn ghost" data-act="staff-hire" data-role="${role}" data-tier="${t}"></button>`).join('')}</div></div>`;
     }
   }
-  h += `<h2 class="sec">Stroje a obsluha</h2>`;
   const owned = MACHINES.filter(m => G.machines[m.id] > 0);
-  if (!owned.length) h += `<div class="empty">Zatím nemáte žádný stroj.</div>`;
-  for (const m of owned) {
-    h += `<div class="card"><b>${STEPS[m.step].icon} ${m.name} ×${G.machines[m.id]}</b><div class="small" data-ms="${m.id}"></div></div>`;
-  }
   h += `<h2 class="sec">Zaměstnanci (${G.workers.length})</h2>`;
   if (!G.workers.length) h += `<div class="empty">Nikoho nezaměstnáváte.</div>`;
   for (const w of G.workers) {
@@ -1275,10 +1328,11 @@ function updateWorkers() {
 
 /* --- Firma --- */
 function buildCompany() {
-  let h = `<div class="card"><h3>🏢 ${esc(G.name)}</h3>
+  let h = `<h2 class="sec" style="margin-top:0">Plán haly</h2>
+    ${hallGridHtml()}
+    <div class="card"><h3>🏢 ${esc(G.name)}</h3>
       <div class="small">${START.icon} ${START.name} · bonus: ${START.perkText}</div>
       <div class="row small block" data-cstats></div></div>
-    <h2 class="sec">Sídlo</h2>
     <div class="card"><b data-hname></b>
       <div class="small" data-hinfo></div>
       <div class="bar"><i data-hbar></i></div>
@@ -1288,9 +1342,6 @@ function buildCompany() {
            <button class="btn full" data-act="hall"></button>`
         : `<div class="small" style="margin-top:8px">Největší sídlo. Víc se do areálu nevejde.</div>`}
     </div>
-    <h2 class="sec">Plán haly</h2>
-    ${hallGridHtml()}
-    <h2 class="sec">Sklad</h2>
     <div class="card"><b data-wname></b>
       <div class="small" data-winfo></div>
       <div class="bar"><i data-wbar></i></div>
@@ -1483,7 +1534,19 @@ view.addEventListener('click', e => {
   } else if (act === 'fire') {
     const w = G.workers.find(x => x.id == id);
     if (w) askConfirm(`Propustit zaměstnance ${w.name}?`, 'Propustit', () => { G.workers = G.workers.filter(x => x !== w); renderView(true); });
+  } else if (act === 'gridedit') {
+    gridEdit = !gridEdit; if (!gridEdit) gridSel = null; rebuildHall();
+  } else if (act === 'gridauto') {
+    G.layout = {}; gridSel = null; rebuildHall();
+  } else if (act === 'gridrot') {
+    moveSel(null);
+  } else if (act === 'gridcell') {
+    if (gridEdit && gridSel) {
+      const r = b.getBoundingClientRect(), c = gridCell + 0;
+      moveSel({ cx: Math.floor((e.clientX - r.left) / c), cy: Math.floor((e.clientY - r.top) / c) });
+    }
   } else if (act === 'gridsel') {
+    gridSel = b.dataset.key || null;
     view.querySelectorAll('.mt.sel').forEach(x => x.classList.remove('sel'));
     b.classList.add('sel');
     const gi = view.querySelector('[data-ginfo]');
