@@ -103,6 +103,16 @@ button.chip{cursor:pointer;min-height:36px;touch-action:manipulation}
   background-size:var(--c) var(--c),var(--c) var(--c),100% 100%,cover;background-position:0 0,0 0,0 0,center;border-radius:6px}
 .hgrid.hbg .mt{background:rgba(20,26,32,.45);box-shadow:0 2px 8px #0008}
 .hgrid.hbg .mt.wh{background:rgba(42,47,54,.7)}
+.scene{position:relative;width:100%;margin-top:8px;border-radius:10px;overflow:hidden;border:1px solid var(--line);background:#14110f center/cover no-repeat}
+.scene svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.scene svg polygon{fill:transparent;stroke:none}
+.scene svg polygon.sel{fill:rgba(255,159,28,.18);stroke:var(--acc);stroke-width:2;vector-effect:non-scaling-stroke}
+.sm{position:absolute;transform:translate(-50%,-100%);cursor:pointer;line-height:0}
+.sm img{width:100%;height:auto;display:block;filter:drop-shadow(0 4px 5px #0009);pointer-events:none}
+.sm .ph{display:flex;align-items:center;justify-content:center;aspect-ratio:1;width:100%;font-size:clamp(14px,3vw,34px);background:rgba(20,26,32,.55);border:2px solid #31404e;border-radius:8px;line-height:1}
+.sm .bdg{position:absolute;left:50%;top:6%;transform:translateX(-50%);font-size:12px;background:#000b;border-radius:6px;padding:0 4px;line-height:1.4}
+.sm.idle .bdg{background:#7a1f1f}
+.sm:hover img,.sm.sel img{filter:drop-shadow(0 0 8px var(--acc))}
 .zoom{display:flex;gap:6px}.zoom .btn{min-height:34px;padding:4px 12px}
 .est{font-size:.88rem;margin-top:8px;line-height:1.5}
 label.chk{display:flex;gap:10px;align-items:center;padding:8px 0;font-size:.92rem;color:var(--tx)}
@@ -506,7 +516,52 @@ document.addEventListener('load', e => {
 }, true);
 
 /* Pozadí plánu haly: první nalezený obrázek z tohoto seznamu (složka Grafika Stroje nebo vedle index.html). */
-const HALL_BG_NAMES = ['Pozadi haly', 'Hala', 'Stroje pokupe', 'Stroje pohromade', 'Stroje pohromadě'];
+const HALL_BG_NAMES = ['Prazdna hala', 'Prázdná hala', 'Hala prazdna', 'Pozadi haly', 'Hala'];
+/* Kam v obrázku prázdné haly padá podlaha: tři rohy podlahy jako podíl šířky/výšky obrázku
+   (A = horní roh, B = pravý roh, D = levý roh). Čtvrtý roh se dopočítá. Když obrázek sedí jinak, stačí přepsat. */
+const HALL_QUAD = { A: [0.53, 0.21], B: [0.98, 0.62], D: [0.01, 0.62] };
+const SCENE_AR = 16 / 9;
+let hallView = 'scene';                          // 'scene' = obrázek haly, 'grid' = mřížka
+const KEYED = {}, KEYING = {};                   // id stroje -> obrázek s průhledným pozadím (nebo '' když nejde)
+function ensureKeyed(m) {
+  if (KEYED[m.id] !== undefined || KEYING[m.id]) return;
+  KEYING[m.id] = true;
+  const c = imgCandidates(m); let i = 0;
+  const done = v => { KEYED[m.id] = v; delete KEYING[m.id]; if (G && curTab === 'company' && !gridEdit) renderView(true); };
+  const next = () => {
+    if (i >= c.length) return done('');
+    const im = new Image(), u = c[i++];
+    im.onerror = next;
+    im.onload = () => {
+      try {                                      // odstraní jednobarevné pozadí napojené na okraj obrázku
+        const k = Math.min(1, 640 / im.naturalWidth), W = Math.round(im.naturalWidth * k), H = Math.round(im.naturalHeight * k);
+        const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+        const cx = cv.getContext('2d'); cx.drawImage(im, 0, 0, W, H);
+        const d = cx.getImageData(0, 0, W, H), px = d.data;
+        const at = (x, y) => (y * W + x) * 4;
+        const cs = [at(0, 0), at(W - 1, 0), at(0, H - 1), at(W - 1, H - 1)];
+        if (cs.some(o => px[o + 3] < 250)) return done(u);          // už je průhledný
+        const bg = [0, 1, 2].map(j => cs.reduce((a, o) => a + px[o + j], 0) / 4);
+        if (cs.some(o => Math.abs(px[o] - bg[0]) + Math.abs(px[o + 1] - bg[1]) + Math.abs(px[o + 2] - bg[2]) > 60)) return done(u);   // pozadí není jednolité
+        const near = o => Math.abs(px[o] - bg[0]) + Math.abs(px[o + 1] - bg[1]) + Math.abs(px[o + 2] - bg[2]) < 54;
+        const seen = new Uint8Array(W * H), st = [];
+        const push = (x, y) => { const q = y * W + x; if (!seen[q] && near(q * 4)) { seen[q] = 1; st.push(q); } };
+        for (let x = 0; x < W; x++) { push(x, 0); push(x, H - 1); }
+        for (let y = 0; y < H; y++) { push(0, y); push(W - 1, y); }
+        while (st.length) {
+          const q = st.pop(), x = q % W, y = (q / W) | 0;
+          px[q * 4 + 3] = 0;
+          if (x > 0) push(x - 1, y); if (x < W - 1) push(x + 1, y);
+          if (y > 0) push(x, y - 1); if (y < H - 1) push(x, y + 1);
+        }
+        cx.putImageData(d, 0, 0);
+        done(cv.toDataURL('image/png'));
+      } catch (e) { done(u); }
+    };
+    im.src = u;
+  };
+  next();
+}
 let HALL_BG = '';
 (function probeHallBg() {
   const c = [];
@@ -575,6 +630,37 @@ function unitWorker(m, idx) {                  // pracovník na dané kusu stroj
 function cellPx(hl) {
   return gridCell > 0 ? gridCell : Math.max(14, Math.min(44, Math.floor((view.clientWidth - 56) / hl.w)));
 }
+function sceneHtml(placed, hl) {
+  const Q = HALL_QUAD;
+  const P = (gx, gy) => ({ x: Q.A[0] + gx / hl.w * (Q.B[0] - Q.A[0]) + gy / hl.h * (Q.D[0] - Q.A[0]),
+                           y: Q.A[1] + gx / hl.w * (Q.B[1] - Q.A[1]) + gy / hl.h * (Q.D[1] - Q.A[1]) });
+  const pt = p => `${(p.x * 100).toFixed(2)},${(p.y * 100).toFixed(2)}`;
+  const poly = (x, y, w, h) => [P(x, y), P(x + w, y), P(x + w, y + h), P(x, y + h)].map(pt).join(' ');
+  let svg = `<polygon points="${poly(0, 0, hl.w, hl.h)}" fill="${HALL_BG ? 'none' : '#2b2622'}" stroke="rgba(255,255,255,.25)" stroke-width="1.5" vector-effect="non-scaling-stroke"/>`;
+  for (let i = 2; i < hl.w; i += 2) svg += `<line x1="${P(i, 0).x * 100}" y1="${P(i, 0).y * 100}" x2="${P(i, hl.h).x * 100}" y2="${P(i, hl.h).y * 100}" stroke="rgba(255,255,255,.10)" stroke-width="1" vector-effect="non-scaling-stroke"/>`;
+  for (let j = 2; j < hl.h; j += 2) svg += `<line x1="${P(0, j).x * 100}" y1="${P(0, j).y * 100}" x2="${P(hl.w, j).x * 100}" y2="${P(hl.w, j).y * 100}" stroke="rgba(255,255,255,.10)" stroke-width="1" vector-effect="non-scaling-stroke"/>`;
+  const sorted = placed.slice().sort((a, b) => (a.x + a.w + a.y + a.h) - (b.x + b.w + b.y + b.h));
+  let items = '';
+  for (const p of sorted) {
+    const left = P(p.x, p.y + p.h), right = P(p.x + p.w, p.y), top = P(p.x, p.y), bot = P(p.x + p.w, p.y + p.h);
+    const span = (right.x - left.x) * 100, dh = bot.y - top.y;
+    const ax = (bot.x * 100).toFixed(2), ay = ((bot.y - dh * 0.22) * 100).toFixed(2);
+    const z = Math.round((p.x + p.w + p.y + p.h) * 10);
+    const sel = gridSel === p.key;
+    svg += `<polygon data-pk="${p.key}" class="${sel ? 'sel' : ''}" points="${poly(p.x, p.y, p.w, p.h)}"/>`;
+    const common = `style="left:${ax}%;top:${ay}%;width:${span.toFixed(2)}%;z-index:${z}" data-key="${p.key}" data-act="gridsel"`;
+    if (p.kind === 'm') {
+      ensureKeyed(p.m);
+      const w = unitWorker(p.m, p.idx), k = KEYED[p.m.id];
+      items += `<div class="sm${sel ? ' sel' : ''}${w ? '' : ' idle'}" ${common} data-kind="m" data-mid="${p.m.id}" data-idx="${p.idx}" title="${esc(p.m.name)}">
+        ${k ? `<img src="${k}" alt="">` : `<span class="ph">${STEPS[p.m.step].icon}</span>`}<span class="bdg">${w ? WORKER[w.tier].icon : '⚠'}</span></div>`;
+    } else {
+      items += `<div class="sm${sel ? ' sel' : ''}" ${common} data-kind="${p.kind}" title="${p.kind === 'wh' ? 'Sklad' : 'Kancelář'}"><span class="ph">${p.kind === 'wh' ? '📦' : '🗂️'}</span></div>`;
+    }
+  }
+  return `<div class="scene" style="aspect-ratio:${SCENE_AR}${HALL_BG ? `;background-image:url('${HALL_BG}')` : ''}">
+    <svg viewBox="0 0 100 100" preserveAspectRatio="none">${svg}</svg>${items}</div>`;
+}
 function hallGridHtml() {
   const hl = HALLS[G.hall];
   let { placed, failed } = packHall(hallItems(), hl.w, hl.h, G.layout);
@@ -594,10 +680,13 @@ function hallGridHtml() {
   return `<div class="card wide">
     <div class="row"><b>Hala ${hl.w} × ${hl.h} m</b><span class="zoom">
       <button class="btn ${gridEdit ? '' : 'ghost'}" data-act="gridedit">${gridEdit ? '✔ Hotovo' : '✏️ Upravit'}</button>
-      <button class="btn ghost" data-act="gridzoom" data-d="-1">−</button><button class="btn ghost" data-act="gridzoom" data-d="1">+</button></span></div>
-    <div class="small">Čtvereček = 1 m². Zelený rámeček: stroj má obsluhu, červený ⚠: stojí. ${gridEdit ? 'Úprava: klepněte na stroj a potom na místo v hale, kam ho přesunout.' : 'Klepnutím na stroj zobrazíte detail.'}</div>
+      ${gridEdit ? '' : `<button class="btn ghost" data-act="gridview">${hallView === 'scene' ? '▦ Mřížka' : '🏭 Hala'}</button>`}
+      ${(gridEdit || hallView === 'grid') ? `<button class="btn ghost" data-act="gridzoom" data-d="-1">−</button><button class="btn ghost" data-act="gridzoom" data-d="1">+</button>` : ''}</span></div>
+    <div class="small">${(gridEdit || hallView === 'grid') ? 'Čtvereček = 1 m². Zelený rámeček: stroj má obsluhu, červený ⚠: stojí. ' : 'Stroj s ⚠ nemá obsluhu a stojí. '}${gridEdit ? 'Úprava: klepněte na stroj a potom na místo v hale, kam ho přesunout.' : 'Klepnutím na stroj zobrazíte detail.'}</div>
     ${gridEdit ? `<div class="chips"><button class="chip" data-act="gridrot">🔄 Otočit</button><button class="chip" data-act="gridauto">🧹 Přeskládat automaticky</button></div>` : ''}
-    <div class="hall"><div class="hgrid${gridEdit ? ' edit' : ''}${HALL_BG ? ' hbg' : ''}" data-act="gridcell" style="--W:${hl.w};--H:${hl.h};--c:${cellPx(hl)}px${HALL_BG ? `;--bg:url('${HALL_BG}')` : ''}">${tiles}</div></div>
+    ${(gridEdit || hallView === 'grid')
+      ? `<div class="hall"><div class="hgrid${gridEdit ? ' edit' : ''}" data-act="gridcell" style="--W:${hl.w};--H:${hl.h};--c:${cellPx(hl)}px">${tiles}</div></div>`
+      : sceneHtml(placed, hl)}
     <div class="small" style="margin-top:8px" data-ginfo>Obsazeno ${spaceUsed()} z ${hl.area} m².</div>
     ${reset ? '<div class="small">Nový kus se do ručního rozmístění nevešel, hala se přeskládala automaticky.</div>' : ''}
     ${failed.length ? `<div class="small neg">⚠ ${failed.length} ks se do plánu nevešlo.</div>` : ''}
@@ -1614,6 +1703,8 @@ view.addEventListener('click', e => {
   } else if (act === 'fire') {
     const w = G.workers.find(x => x.id == id);
     if (w) askConfirm(`Propustit zaměstnance ${w.name}?`, 'Propustit', () => { G.workers = G.workers.filter(x => x !== w); renderView(true); });
+  } else if (act === 'gridview') {
+    hallView = hallView === 'scene' ? 'grid' : 'scene'; rebuildHall();
   } else if (act === 'gridedit') {
     gridEdit = !gridEdit; if (!gridEdit) gridSel = null; rebuildHall();
   } else if (act === 'gridauto') {
@@ -1627,8 +1718,9 @@ view.addEventListener('click', e => {
     }
   } else if (act === 'gridsel') {
     gridSel = b.dataset.key || null;
-    view.querySelectorAll('.mt.sel').forEach(x => x.classList.remove('sel'));
+    view.querySelectorAll('.mt.sel,.sm.sel,polygon.sel').forEach(x => x.classList.remove('sel'));
     b.classList.add('sel');
+    view.querySelectorAll('polygon[data-pk]').forEach(x => { if (x.dataset.pk === gridSel) x.classList.add('sel'); });
     const gi = view.querySelector('[data-ginfo]');
     if (gi) gi.innerHTML = gridInfo(b);
   } else if (act === 'gridzoom') {
