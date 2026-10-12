@@ -38,6 +38,7 @@ nav button.on{color:var(--acc);border-left-color:var(--acc);background:var(--pan
 @media(min-width:1100px){#view{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(min-width:760px){main{padding:16px 20px 40px}}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px}
+.card.ok{border-color:var(--ok);background:#14251f}
 .card h3{margin:0 0 6px}
 .row{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .small{font-size:.82rem;color:var(--mut)}
@@ -325,6 +326,18 @@ const WAREHOUSES = [
   { name: 'Centrální sklad',  cap: 150000, area: 128, w: 16, h: 8,  rep: 150, cost: 400000 }
 ];
 
+/* Kancelář zabírá místo v hale. Bez ní nelze najmout dispečera (úroveň 1) ani technologa (úroveň 2);
+   zkušený pracovník o úroveň víc. */
+const OFFICES = [
+  { name: 'Žádná kancelář',        area: 0,  w: 0, h: 0, rep: 0,  cost: 0 },
+  { name: 'Kancelář v koutě',      area: 8,  w: 2, h: 4, rep: 10, cost: 4000 },
+  { name: 'Malá kancelář',         area: 16, w: 4, h: 4, rep: 30, cost: 18000 },
+  { name: 'Řídicí centrum',        area: 32, w: 8, h: 4, rep: 70, cost: 80000 }
+];
+const STAFF_NEED = { dispatcher: 1, technologist: 2 };
+const staffNeed = (role, tier) => (STAFF_NEED[role] || 0) + (tier === 'fast' && STAFF_NEED[role] ? 1 : 0);
+const OFFICE_NOTE = lv => ['žádná', 'dispečer (zkušený až od úrovně 2)', 'dispečer, technolog (zkušený technolog od úrovně 3)', 'všichni, i zkušení'][lv];
+
 /* ===================== ZMETKY ===================== */
 /* Šance, že se jeden kus na operaci nepovede (1–3 %): podle třídy stroje, zkušenosti pracovníka
    a technologa. Zmetek znamená přepracovat všechny dosavadní operace pro dané kusy + nový materiál. */
@@ -465,9 +478,11 @@ const Cloud = {
 /* ===================== OBRÁZKY A PLÁN HALY ===================== */
 const IMG = {};                                // id stroje -> nalezený soubor, nebo null (žádný není)
 function imgCandidates(m) {
-  const base = STEP_FOLDER[m.step] + '/', out = [];
-  for (const n of [m.name, m.name.replace(/₂/g, '2'), m.id])
-    for (const ext of ['jpg', 'png', 'jpeg', 'webp']) out.push(base + encodeURIComponent(n) + '.' + ext);
+  const out = [], folders = ['Grafika Stroje', STEP_FOLDER[m.step]];
+  const names = [m.name, m.name.replace(/₂/g, '2'), m.name.normalize('NFD'), m.id];
+  for (const f of folders) for (const n of names)
+    for (const ext of ['jpg', 'png', 'jpeg', 'webp', 'JPG', 'PNG'])
+      out.push(encodeURIComponent(f).replace(/%20/g, '%20') + '/' + encodeURIComponent(n) + '.' + ext);
   return [...new Set(out)];
 }
 function imgTag(m) {
@@ -490,6 +505,8 @@ let gridEdit = false, gridSel = null;
 let gridCell = 24;                             // velikost čtverečku (px) v plánu haly
 function hallItems() {
   const items = [], w = WAREHOUSES[G.wh];
+  const of = OFFICES[G.office];
+  if (of.area) items.push({ kind: 'of', key: 'of', w: of.w, h: of.h, area: of.area, ord: -2, idx: 0 });
   if (w.area) items.push({ kind: 'wh', key: 'wh', w: w.w, h: w.h, area: w.area, ord: -1, idx: 0 });
   MACHINES.forEach((m, mi) => {
     const n = G.machines[m.id] || 0;
@@ -542,6 +559,7 @@ function hallGridHtml() {
   }
   const tiles = placed.map(p => {
     const st = `grid-column:${p.x + 1} / span ${p.w};grid-row:${p.y + 1} / span ${p.h}`;
+    if (p.kind === 'of') return `<div class="mt wh${gridSel === 'of' ? ' sel' : ''}" style="${st}" data-key="of" data-act="gridsel" data-kind="of" title="Kancelář"><span class="emo">🗂️</span></div>`;
     if (p.kind === 'wh') return `<div class="mt wh${gridSel === 'wh' ? ' sel' : ''}" style="${st}" data-key="wh" data-act="gridsel" data-kind="wh" title="Sklad"><span class="emo">📦</span></div>`;
     const w = unitWorker(p.m, p.idx);
     return `<div class="mt ${w ? 'on' : 'off'}${gridSel === p.key ? ' sel' : ''}" style="${st}" data-key="${p.key}" data-act="gridsel" data-kind="m" data-mid="${p.m.id}" data-idx="${p.idx}" title="${esc(p.m.name)}">
@@ -582,6 +600,10 @@ function moveSel(t) {
   rebuildHall();
 }
 function gridInfo(el) {
+  if (el.dataset.kind === 'of') {
+    const o = OFFICES[G.office];
+    return `<b>🗂️ ${o.name}</b> · ${o.w} × ${o.h} m (${o.area} m²)<br>Umožňuje: ${OFFICE_NOTE(G.office)}`;
+  }
   if (el.dataset.kind === 'wh') {
     const w = WAREHOUSES[G.wh];
     return `<b>📦 ${w.name}</b> · ${w.w} × ${w.h} m (${w.area} m²)<br>Zásoba ${fmt(G.stock)} / ${fmt(w.cap)} Kč`;
@@ -610,7 +632,7 @@ function newState(startId, name) {
     machines: Object.assign({}, st.machines), upg: {},
     techs: Object.fromEntries((st.techs || STEP_ORDER).map(t => [t, true])),
     orders: [], active: [], nextOrderId: 1, spawnTimer: 0,
-    hall: 0, wh: 0, layout: {}, stock: 0, autoStock: 0, scrapped: 0,
+    hall: 0, wh: 0, office: 0, layout: {}, stock: 0, autoStock: 0, scrapped: 0,
     staff: { dispatcher: null, storekeeper: null, technologist: null },
     disp: defaultDisp(), dispTimer: 0, stockTimer: 0,
     workers: [{ id: 1, name: randName(), tier: 'norm', mid: st.worker || null }], nextWorkerId: 2,
@@ -638,6 +660,8 @@ function sanitize(s) {
   }
   d.wh = Math.min(Math.max(0, d.wh | 0), WAREHOUSES.length - 1);
   d.stock = Math.min(Math.max(0, +d.stock || 0), WAREHOUSES[d.wh].cap);
+  d.office = Math.min(Math.max(0, d.office | 0), OFFICES.length - 1);
+  for (const r of ['dispatcher', 'technologist']) if (d.staff[r]) d.office = Math.max(d.office, staffNeed(r, d.staff[r].tier));  // starší hra
   d.autoStock = [0, 0.25, 0.5, 0.75].includes(d.autoStock) ? d.autoStock : 0;
   d.disp = Object.assign(defaultDisp(), s.disp);
   if (!PRIO_NAMES[d.disp.prio]) d.disp.prio = 'profit';
@@ -650,7 +674,7 @@ function sanitize(s) {
     if (L && [L.x, L.y, L.w, L.h].every(Number.isInteger) && L.x >= 0 && L.y >= 0 && L.w > 0 && L.h > 0 && L.w <= 32 && L.h <= 32) lay[k] = { x: L.x, y: L.y, w: L.w, h: L.h };
   }
   d.layout = lay;
-  const used = MACHINES.reduce((n, m) => n + (d.machines[m.id] || 0) * FOOTPRINT[m.tier], 0) + WAREHOUSES[d.wh].area;
+  const used = MACHINES.reduce((n, m) => n + (d.machines[m.id] || 0) * FOOTPRINT[m.tier], 0) + WAREHOUSES[d.wh].area + OFFICES[d.office].area;
   while (used > HALLS[d.hall].area && d.hall < HALLS.length - 1) d.hall++;   // rozměry haly se změnily
   if (!(d.nextWorkerId > 0)) d.nextWorkerId = 1 + d.workers.reduce((m, w) => Math.max(m, w.id || 0), 0);
   if (![d.money, d.rep, d.last].every(Number.isFinite)) return null;
@@ -718,7 +742,7 @@ function bestMachineForHire() {                // nejlepší stroj, který ješt
 }
 const bestWorkerWithoutMachine = () => G.workers.filter(w => !w.mid)
   .sort((x, y) => WORKER[y.tier].speed - WORKER[x.tier].speed)[0] || null;
-const spaceUsed = () => MACHINES.reduce((n, m) => n + (G.machines[m.id] || 0) * FOOTPRINT[m.tier], 0) + WAREHOUSES[G.wh].area;
+const spaceUsed = () => MACHINES.reduce((n, m) => n + (G.machines[m.id] || 0) * FOOTPRINT[m.tier], 0) + WAREHOUSES[G.wh].area + OFFICES[G.office].area;
 const hallCap = () => HALLS[G.hall].area;
 const spaceFree = () => hallCap() - spaceUsed();
 const sellValue = m => Math.floor(0.5 * Math.ceil(m.price * Math.pow(1.15, Math.max(0, (G.machines[m.id] || 1) - 1))));
@@ -1079,7 +1103,7 @@ const chips = steps => steps.map(s => `<span class="chip">${STEPS[s].icon} ${STE
 /* --- Zakázky --- */
 function dispatcherCard() {
   const d = G.staff.dispatcher;
-  if (!d) return `<div class="hint">🧑‍💼 Dispečer by zakázky přijímal za vás podle vašich pravidel. Najmete ho v záložce Lidé.</div>`;
+  if (!d) return `<div class="hint">🧑‍💼 Dispečer by zakázky přijímal za vás podle vašich pravidel. Potřebujete kancelář (Firma) a pak ho najmete v záložce Lidé.</div>`;
   return `<div class="card slim"><div><b>🧑‍💼 Dispečer: ${esc(d.name)}</b>
     <div class="small">${STAFF_TIER[d.tier]} · prověřuje nabídku každých ${DISP_INT[d.tier]} s<br>Priorita: ${PRIO_NAMES[G.disp.prio]} · marže od ${G.disp.margin} %</div></div>
     <button class="btn ghost" data-act="dispopen">Pravidla</button></div>`;
@@ -1271,6 +1295,13 @@ function buildWorkers() {
           `<button class="btn ghost" data-act="staff-hire" data-role="${role}" data-tier="${t}"></button>`).join('')}</div></div>`;
     }
   }
+  h += `<h2 class="sec">Najmout</h2>`;
+  for (const tier of WORKER_ORDER) {
+    const t = WORKER[tier];
+    h += `<div class="card slim"><div><b>${t.icon} ${t.name}</b>
+      <div class="small">${t.desc} · rychlost ×${t.speed} · mzda ${Math.round(t.wage * 60)} Kč/min práce</div></div>
+      <button class="btn" data-act="hire" data-tier="${tier}"></button></div>`;
+  }
   const owned = MACHINES.filter(m => G.machines[m.id] > 0);
   h += `<h2 class="sec">Zaměstnanci (${G.workers.length})</h2>`;
   if (!G.workers.length) h += `<div class="empty">Nikoho nezaměstnáváte.</div>`;
@@ -1278,20 +1309,13 @@ function buildWorkers() {
     const t = WORKER[w.tier];
     const opts = owned.filter(m => G.techs[m.step] && (freeSlots(m.id, w.id) > 0 || w.mid === m.id))
       .map(m => `<option value="${m.id}"${w.mid === m.id ? ' selected' : ''}>${STEPS[m.step].icon} ${m.name}</option>`).join('');
-    h += `<div class="card" data-wid="${w.id}">
+    h += `<div class="card wk${w.mid ? ' ok' : ''}" data-wid="${w.id}">
       <div class="row"><b>${t.icon} ${esc(w.name)}</b><span class="tag">${t.name}</span></div>
       <label class="small">Pracuje na stroji
         <select data-assign="${w.id}"><option value=""${w.mid ? '' : ' selected'}>– nepřidělen –</option>${opts}</select></label>
       <div class="small" style="margin-top:6px" data-wi></div>
       <button class="btn danger" style="margin-top:8px" data-act="fire" data-id="${w.id}">Propustit</button>
     </div>`;
-  }
-  h += `<h2 class="sec">Najmout</h2>`;
-  for (const tier of WORKER_ORDER) {
-    const t = WORKER[tier];
-    h += `<div class="card slim"><div><b>${t.icon} ${t.name}</b>
-      <div class="small">${t.desc} · rychlost ×${t.speed} · mzda ${Math.round(t.wage * 60)} Kč/min práce</div></div>
-      <button class="btn" data-act="hire" data-tier="${tier}"></button></div>`;
   }
   return h;
 }
@@ -1307,14 +1331,16 @@ function updateWorkers() {
     const e = card.querySelector('[data-wi]');
     if (!w || !e) return;
     const m = w.mid && MACH[w.mid];
+    card.classList.toggle('ok', !!m);
     e.innerHTML = m
       ? `Výkon <b>×${workerFactor(w, m).toFixed(2)}</b> → <b>${(machineRate(m) * workerFactor(w, m)).toFixed(2)}/s</b> · mzda ${Math.round(WORKER[w.tier].wage * 60)} Kč/min práce`
       : 'Bez stroje – nepracuje a nestojí nic.';
   });
   view.querySelectorAll('[data-act="staff-hire"]').forEach(b => {
     const role = b.dataset.role, t = b.dataset.tier, c = STAFF_PAY[t].hire;
-    const noWh = role === 'storekeeper' && G.wh === 0;
-    const txt = noWh ? 'Nejdřív potřebujete sklad (Firma)' : `${STAFF_TIER[t]} · ${fmt(c)} Kč`;
+    const needOf = staffNeed(role, t), noOf = G.office < needOf;
+    const noWh = (role === 'storekeeper' && G.wh === 0) || noOf;
+    const txt = noOf ? `Kancelář úrovně ${needOf} (Firma)` : noWh ? 'Nejdřív potřebujete sklad (Firma)' : `${STAFF_TIER[t]} · ${fmt(c)} Kč`;
     if (b.textContent !== txt) b.textContent = txt;
     b.disabled = noWh || G.money < c;
   });
@@ -1341,6 +1367,15 @@ function buildCompany() {
             reputace ${HALLS[G.hall + 1].rep} · ${fmt(HALLS[G.hall + 1].cost)} Kč</div>
            <button class="btn full" data-act="hall"></button>`
         : `<div class="small" style="margin-top:8px">Největší sídlo. Víc se do areálu nevejde.</div>`}
+    </div>
+    <div class="card"><b data-oname></b>
+      <div class="small" data-oinfo></div>
+      <div class="small" style="margin-top:6px">Dispečer a technolog potřebují kancelář. Dispečer od úrovně 1, technolog od úrovně 2, zkušený pracovník vždy o úroveň víc.</div>
+      ${OFFICES[G.office + 1]
+        ? `<div class="small" style="margin-top:8px">Další: <b>${OFFICES[G.office + 1].name}</b> (${OFFICES[G.office + 1].w} × ${OFFICES[G.office + 1].h} m) ·
+            reputace ${OFFICES[G.office + 1].rep} · ${fmt(OFFICES[G.office + 1].cost)} Kč</div>
+           <button class="btn full" data-act="ofup"></button>`
+        : `<div class="small" style="margin-top:8px">Největší kancelář.</div>`}
     </div>
     <div class="card"><b data-wname></b>
       <div class="small" data-winfo></div>
@@ -1417,7 +1452,22 @@ function updateCompany() {
   });
 }
 
+function updateOffice() {
+  const on = view.querySelector('[data-oname]');
+  if (!on) return;
+  const o = OFFICES[G.office];
+  on.textContent = `🗂️ ${o.name}`;
+  view.querySelector('[data-oinfo]').textContent = o.area ? `Zabírá ${o.w} × ${o.h} m (${o.area} m²) · umožňuje: ${OFFICE_NOTE(G.office)}` : 'Zatím nemáte kancelář, nelze najmout dispečera ani technologa.';
+  const n = OFFICES[G.office + 1], b = view.querySelector('[data-act="ofup"]');
+  if (b && n) {
+    const low = G.rep < n.rep, noSpace = spaceFree() < n.area - o.area;
+    const tx = low ? `Potřeba ⭐ ${n.rep}` : noSpace ? 'Není místo v hale' : `${G.office ? 'Rozšířit' : 'Postavit'} za ${fmt(n.cost)} Kč`;
+    if (b.textContent !== tx) b.textContent = tx;
+    b.disabled = low || noSpace || G.money < n.cost;
+  }
+}
 function updateWarehouse() {
+  updateOffice();
   const wn = view.querySelector('[data-wname]');
   if (!wn) return;
   const w = WAREHOUSES[G.wh];
@@ -1560,7 +1610,7 @@ view.addEventListener('click', e => {
     openDispatcher();
   } else if (act === 'staff-hire') {
     const role = b.dataset.role, t = b.dataset.tier;
-    if (STAFF[role] && STAFF_PAY[t] && !G.staff[role] && G.money >= STAFF_PAY[t].hire && !(role === 'storekeeper' && G.wh === 0)) {
+    if (STAFF[role] && STAFF_PAY[t] && !G.staff[role] && G.money >= STAFF_PAY[t].hire && !(role === 'storekeeper' && G.wh === 0) && G.office >= staffNeed(role, t)) {
       G.money -= STAFF_PAY[t].hire;
       G.staff[role] = { name: randName(), tier: t };
       toast(`${STAFF[role].icon} ${G.staff[role].name} nastoupil jako ${STAFF[role].name.toLowerCase()}`);
@@ -1572,6 +1622,13 @@ view.addEventListener('click', e => {
   } else if (act === 'stockbuy') {
     const amt = b.dataset.amt === 'max' ? 1e12 : +b.dataset.amt;
     if (buyStock(amt) > 0) { renderView(false); renderHeader(); }
+  } else if (act === 'ofup') {
+    const n = OFFICES[G.office + 1];
+    if (n && G.rep >= n.rep && G.money >= n.cost && spaceFree() >= n.area - OFFICES[G.office].area) {
+      G.money -= n.cost; G.office++;
+      toast(`🗂️ Nová kancelář: ${n.name}`);
+      renderView(true); renderHeader();
+    }
   } else if (act === 'whup') {
     const nw = WAREHOUSES[G.wh + 1];
     if (nw && G.rep >= nw.rep && G.money >= nw.cost && spaceFree() >= nw.area - WAREHOUSES[G.wh].area) {
