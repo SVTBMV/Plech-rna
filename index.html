@@ -269,11 +269,11 @@ const STARTS = {
     money: 200, machines: { tire_hand: 1 }, worker: 'tire_hand', techs: ['wheels'],
     perk: { speed: { wheels: 1.25 } }, perkText: 'Pneuservis o 25 % rychlejší'
   },
-  rychly: {
-    ind: 'car', icon: '🛢️', name: 'Rychlý servis',
-    desc: 'Výměna oleje a kapalin na zvedáku. Rychlá a poctivá práce, vše ostatní kooperujete.',
-    money: 220, machines: { jack: 1 }, worker: 'jack', techs: ['lube'],
-    perk: { speed: { lube: 1.25 } }, perkText: 'Olej a kapaliny o 25 % rychlejší'
+  detailing: {
+    ind: 'car', icon: '🧽', name: 'Auto detailing',
+    desc: 'Čištění, mytí a leštění aut. Levný start s ručním mytím, vše ostatní kooperujete.',
+    money: 180, machines: { wash_hand: 1 }, worker: 'wash_hand', techs: ['detail'],
+    perk: { speed: { detail: 1.25 } }, perkText: 'Mytí a detailing o 25 % rychlejší'
   },
   diagnostika: {
     ind: 'car', icon: '🔍', name: 'Diagnostické centrum',
@@ -282,7 +282,7 @@ const STARTS = {
     perk: { rep: 1.5 }, perkText: 'Reputace roste 1,5× rychleji'
   },
   servis: {
-    ind: 'car', icon: '🚗', name: 'Malý autoservis',
+    ind: 'car', icon: '🚗', name: 'Autoservis',
     desc: 'Diagnostika a výměna oleje. Brzdy, pneu a ostatní práce zatím kooperujete.',
     money: 400, machines: { obd: 1, jack: 1 }, worker: 'jack', techs: ['diag', 'lube'],
     perk: { mat: 0.9 }, perkText: 'Náhradní díly o 10 % levnější'
@@ -319,6 +319,8 @@ const PRODUCTS = [
 ];
 PRODUCTS.push(                                    // autoservis
   { id: 'svc_wash',   icon: '🧽', name: 'Mytí a leštění vozů',            steps: ['detail'],                                  q: [8,20],  work: 2.5, mat: 1,   price: 11,  rep: 0,   g: 1 },
+  { id: 'svc_interior',icon: '🧼', name: 'Hloubkové čištění interiéru',   steps: ['detail'],                                  q: [5,14],  work: 3,   mat: 2,   price: 17,  rep: 0,   g: 1 },
+  { id: 'svc_polish', icon: '✨', name: 'Leštění a ochrana laku',         steps: ['detail'],                                  q: [4,10],  work: 4,   mat: 5,   price: 30,  rep: 3,   g: 1 },
   { id: 'svc_tires',  icon: '🛞', name: 'Přezutí na sezónní pneu',        steps: ['wheels'],                                  q: [8,20],  work: 2.5, mat: 1,   price: 12,  rep: 0,   g: 1 },
   { id: 'svc_oil',    icon: '🛢️', name: 'Výměna oleje a filtrů',          steps: ['lube'],                                    q: [6,16],  work: 3,   mat: 7,   price: 22,  rep: 0,   g: 1 },
   { id: 'svc_diag',   icon: '🔍', name: 'Diagnostika závad',              steps: ['diag'],                                    q: [8,18],  work: 2.5, mat: 0.5, price: 14,  rep: 0,   g: 1 },
