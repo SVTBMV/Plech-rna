@@ -39,6 +39,7 @@ nav button.on{color:var(--acc);border-left-color:var(--acc);background:var(--pan
 @media(min-width:760px){main{padding:16px 20px 40px}}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px}
 .card.ok{border-color:var(--ok);background:#14251f}
+.card.sub{border-style:dashed;border-color:var(--bad);margin-left:14px}
 .card h3{margin:0 0 6px}
 .row{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .small{font-size:.82rem;color:var(--mut)}
@@ -154,7 +155,24 @@ const STEPS = {
   wet:    { name: 'Mokré lakování',          icon: '🖌️' },
   plate:  { name: 'Povrchové úpravy',        icon: '🧪' }    // pozink, elox ap.
 };
-const STEP_ORDER = ['cut', 'bend', 'roll', 'weld', 'fit', 'grind', 'powder', 'wet', 'plate'];
+Object.values(STEPS).forEach(st => { st.ind = 'metal'; });
+Object.assign(STEPS, {                           // autoservis
+  diag:   { name: 'Diagnostika',            icon: '🔍', ind: 'car' },
+  wheels: { name: 'Pneuservis',             icon: '🛞', ind: 'car' },
+  lube:   { name: 'Olej a kapaliny',         icon: '🛢️', ind: 'car' },
+  brakes: { name: 'Brzdy a podvozek',        icon: '🛑', ind: 'car' },
+  engine: { name: 'Motor a převodovka',      icon: '🔩', ind: 'car' },
+  elec:   { name: 'Autoelektrika',           icon: '⚡', ind: 'car' },
+  ac:     { name: 'Klimatizace',             icon: '❄️', ind: 'car' },
+  detail: { name: 'Mytí a detailing',        icon: '🧽', ind: 'car' }
+});
+const INDUSTRIES = {
+  metal: { name: 'Kovovýroba', icon: '🏭', desc: 'Výroba dílů z tenkých plechů.' },
+  car:   { name: 'Autoservis', icon: '🚗', desc: 'Opravy a údržba osobních aut.' }
+};
+const STEP_ORDER = ['cut', 'bend', 'roll', 'weld', 'fit', 'grind', 'powder', 'wet', 'plate',
+                    'diag', 'wheels', 'lube', 'brakes', 'engine', 'elec', 'ac', 'detail'];
+const stepsOf = ind => STEP_ORDER.filter(st => STEPS[st].ind === ind);
 
 const MACHINES = [
   { id: 'shear',       step: 'cut',    name: 'Tabulové nůžky',                 price: 120,   rate: 0.6 },
@@ -185,38 +203,89 @@ const MACHINES = [
   { id: 'galv',        step: 'plate',  name: 'Galvanická linka (pozink)',      price: 3000,  rate: 3 },
   { id: 'anod',        step: 'plate',  name: 'Eloxovací linka',                price: 18000, rate: 16 }
 ];
+MACHINES.push(                                    // autoservis: 3 třídy strojů v každé operaci
+  { id: 'obd',          step: 'diag',   name: 'OBD čtečka a notebook',          price: 100,   rate: 0.6 },
+  { id: 'tester',      step: 'diag',   name: 'Diagnostický tester',            price: 1800,  rate: 3.2 },
+  { id: 'diag_line',   step: 'diag',   name: 'Diagnostická linka s měřením',   price: 14000, rate: 16 },
+  { id: 'tire_hand',   step: 'wheels', name: 'Ruční montáž pneu',              price: 90,    rate: 0.5 },
+  { id: 'tire_machine',step: 'wheels', name: 'Pneumontážní stroj',             price: 1500,  rate: 3 },
+  { id: 'tire_line',   step: 'wheels', name: 'Automatická pneulinka',          price: 12000, rate: 16 },
+  { id: 'jack',        step: 'lube',   name: 'Zvedák a olejová vana',          price: 120,   rate: 0.6 },
+  { id: 'lift2',       step: 'lube',   name: 'Dvousloupový zvedák',            price: 2200,  rate: 3.3 },
+  { id: 'lube_line',   step: 'lube',   name: 'Rychloservisní linka',           price: 14000, rate: 17 },
+  { id: 'hand_tools',  step: 'brakes', name: 'Dílenské nářadí a stojany',      price: 150,   rate: 0.6 },
+  { id: 'brake_bench', step: 'brakes', name: 'Brzdová stolice',                price: 2400,  rate: 3.2 },
+  { id: 'align',       step: 'brakes', name: 'Geometrie a podvozková linka',   price: 16000, rate: 17 },
+  { id: 'engine_hand', step: 'engine', name: 'Motorové nářadí a jeřáb',        price: 200,   rate: 0.5 },
+  { id: 'engine_stand',step: 'engine', name: 'Motorový stojan s lisem',        price: 3000,  rate: 3 },
+  { id: 'engine_cell', step: 'engine', name: 'Linka na generální opravy',      price: 20000, rate: 17 },
+  { id: 'multimeter',  step: 'elec',   name: 'Multimetr a pájka',              price: 90,    rate: 0.5 },
+  { id: 'scope',       step: 'elec',   name: 'Osciloskop a programátor ECU',   price: 2000,  rate: 2.8 },
+  { id: 'ecu_lab',     step: 'elec',   name: 'Elektro-diagnostické pracoviště',price: 15000, rate: 16 },
+  { id: 'ac_hand',     step: 'ac',     name: 'Ruční plnička klimatizací',      price: 140,   rate: 0.6 },
+  { id: 'ac_station',  step: 'ac',     name: 'Servisní stanice klimatizací',   price: 2500,  rate: 3 },
+  { id: 'ac_line',     step: 'ac',     name: 'Linka s recyklací chladiva',     price: 15000, rate: 16 },
+  { id: 'wash_hand',   step: 'detail', name: 'Ruční mytí a leštění',           price: 60,    rate: 0.5 },
+  { id: 'wash_box',    step: 'detail', name: 'Mycí box s lešticí stanicí',     price: 1400,  rate: 2.8 },
+  { id: 'detail_line', step: 'detail', name: 'Detailingová linka',             price: 11000, rate: 15 }
+);
 const MACH = Object.fromEntries(MACHINES.map(m => [m.id, m]));
 
 const STARTS = {
   klempir: {
-    icon: '🔧', name: 'Klempířská dílna',
+    ind: 'metal', icon: '🔧', name: 'Klempířská dílna',
     desc: 'Malá rodinná dílna: řezání a ohýbání. Ostatní operace musíte zatím kooperovat.',
     money: 400, machines: { shear: 1, hand_bender: 1 }, worker: 'shear', techs: ['cut', 'bend'],
     perk: { mat: 0.9 }, perkText: 'Materiál o 10 % levnější'
   },
   domaci: {
-    icon: '🏠', name: 'Domácí zámečnická dílna',
+    ind: 'metal', icon: '🏠', name: 'Domácí zámečnická dílna',
     desc: 'Vrtání, závitování a zahlubování na stolní vrtačce. Levný start, zpočátku drobné zakázky.',
     money: 350, machines: { drill: 1 }, worker: 'drill', techs: ['fit'],
     perk: { speed: { fit: 1.25 } }, perkText: 'Zámečnické práce o 25 % rychlejší'
   },
   laser: {
-    icon: '🔦', name: 'Laserové řezání',
+    ind: 'metal', icon: '🔦', name: 'Laserové řezání',
     desc: 'Jen řezání, ale s CO₂ laserem. Vše ostatní kooperujete.',
     money: 150, machines: { co2: 1 }, worker: 'co2', techs: ['cut'],
     perk: { speed: { cut: 1.25 } }, perkText: 'Řezání o 25 % rychlejší'
   },
   ohybarna: {
-    icon: '📐', name: 'Ohýbárna',
+    ind: 'metal', icon: '📐', name: 'Ohýbárna',
     desc: 'Jen ohýbání, ale s hydraulickým lisem. Řezání, svařování i povrchovky kooperujete.',
     money: 250, machines: { press: 1 }, worker: 'press', techs: ['bend'],
     perk: { speed: { bend: 1.25 } }, perkText: 'Ohýbání o 25 % rychlejší'
   },
   automotive: {
-    icon: '🚗', name: 'Subdodavatel pro automotive',
+    ind: 'metal', icon: '🚗', name: 'Subdodavatel pro automotive',
     desc: 'Svařovna pro automotive: jen svařování. Zákazníci vás rychle doporučí dál.',
     money: 200, machines: { mig: 1 }, worker: 'mig', techs: ['weld'],
     perk: { rep: 2 }, perkText: 'Reputace roste 2× rychleji'
+  }
+  ,
+  pneu: {
+    ind: 'car', icon: '🛞', name: 'Pneuservis',
+    desc: 'Přezouvání a vyvažování. Levný start s ruční montáží pneu, ostatní operace kooperujete.',
+    money: 200, machines: { tire_hand: 1 }, worker: 'tire_hand', techs: ['wheels'],
+    perk: { speed: { wheels: 1.25 } }, perkText: 'Pneuservis o 25 % rychlejší'
+  },
+  rychly: {
+    ind: 'car', icon: '🛢️', name: 'Rychlý servis',
+    desc: 'Výměna oleje a kapalin na zvedáku. Rychlá a poctivá práce, vše ostatní kooperujete.',
+    money: 220, machines: { jack: 1 }, worker: 'jack', techs: ['lube'],
+    perk: { speed: { lube: 1.25 } }, perkText: 'Olej a kapaliny o 25 % rychlejší'
+  },
+  diagnostika: {
+    ind: 'car', icon: '🔍', name: 'Diagnostické centrum',
+    desc: 'Jen diagnostika. Zákazníci si vás doporučují, reputace roste rychleji.',
+    money: 200, machines: { obd: 1 }, worker: 'obd', techs: ['diag'],
+    perk: { rep: 1.5 }, perkText: 'Reputace roste 1,5× rychleji'
+  },
+  servis: {
+    ind: 'car', icon: '🚗', name: 'Malý autoservis',
+    desc: 'Diagnostika a výměna oleje. Brzdy, pneu a ostatní práce zatím kooperujete.',
+    money: 400, machines: { obd: 1, jack: 1 }, worker: 'jack', techs: ['diag', 'lube'],
+    perk: { mat: 0.9 }, perkText: 'Náhradní díly o 10 % levnější'
   }
 };
 
@@ -248,13 +317,37 @@ const PRODUCTS = [
   { id: 'body',       icon: '🚘', name: 'Díl karoserie',                  steps: ['cut','bend','weld','fit','wet'],           q: [20,50], work: 6,   mat: 60,  price: 260, rep: 60,  g: 4 },
   { id: 'encl',       icon: '🔌', name: 'Skříň pro elektroniku IP65',     steps: ['cut','bend','weld','fit','grind','powder'],q: [20,60], work: 8,   mat: 110, price: 520, rep: 100, g: 6 }
 ];
+PRODUCTS.push(                                    // autoservis
+  { id: 'svc_wash',   icon: '🧽', name: 'Mytí a leštění vozů',            steps: ['detail'],                                  q: [8,20],  work: 2.5, mat: 1,   price: 11,  rep: 0,   g: 1 },
+  { id: 'svc_tires',  icon: '🛞', name: 'Přezutí na sezónní pneu',        steps: ['wheels'],                                  q: [8,20],  work: 2.5, mat: 1,   price: 12,  rep: 0,   g: 1 },
+  { id: 'svc_oil',    icon: '🛢️', name: 'Výměna oleje a filtrů',          steps: ['lube'],                                    q: [6,16],  work: 3,   mat: 7,   price: 22,  rep: 0,   g: 1 },
+  { id: 'svc_diag',   icon: '🔍', name: 'Diagnostika závad',              steps: ['diag'],                                    q: [8,18],  work: 2.5, mat: 0.5, price: 14,  rep: 0,   g: 1 },
+  { id: 'check',      icon: '🧾', name: 'Předsezónní prohlídka',          steps: ['diag','lube'],                             q: [4,10],  work: 2.5, mat: 8,   price: 36,  rep: 0,   g: 1 },
+  { id: 'svc_brake',  icon: '🛑', name: 'Výměna brzdových destiček',      steps: ['brakes'],                                  q: [5,12],  work: 3,   mat: 15,  price: 42,  rep: 3,   g: 1 },
+  { id: 'svc_elec',   icon: '⚡', name: 'Oprava elektroinstalace',        steps: ['elec'],                                    q: [4,10],  work: 3.5, mat: 9,   price: 40,  rep: 3,   g: 1 },
+  { id: 'svc_ac',     icon: '❄️', name: 'Plnění klimatizací',             steps: ['ac'],                                      q: [5,12],  work: 2.5, mat: 7,   price: 30,  rep: 4,   g: 1 },
+  { id: 'tires_full', icon: '⚖️', name: 'Pneuservis s vyvážením',         steps: ['diag','wheels'],                           q: [6,14],  work: 2.5, mat: 3,   price: 32,  rep: 5,   g: 1 },
+  { id: 'cleanup',    icon: '🚿', name: 'Servis a mytí vozu',             steps: ['lube','detail'],                           q: [5,12],  work: 2.5, mat: 8,   price: 40,  rep: 5,   g: 1 },
+  { id: 'stk',        icon: '📋', name: 'Příprava na STK',                steps: ['diag','brakes','lube'],                    q: [4,10],  work: 4,   mat: 22,  price: 85,  rep: 8,   g: 1 },
+  { id: 'ac_service', icon: '🌬️', name: 'Servis klimatizace s diagnostikou', steps: ['diag','ac'],                            q: [4,10],  work: 3.5, mat: 13,  price: 65,  rep: 10,  g: 1 },
+  { id: 'elec_diag',  icon: '🔌', name: 'Hledání závady v elektronice',   steps: ['diag','elec'],                             q: [3,8],   work: 4,   mat: 15,  price: 75,  rep: 12,  g: 2 },
+  { id: 'chassis',    icon: '🛠️', name: 'Oprava podvozku',                steps: ['diag','brakes','wheels'],                  q: [3,8],   work: 4.5, mat: 30,  price: 115, rep: 15,  g: 2 },
+  { id: 'fleet',      icon: '🚚', name: 'Servis firemní flotily',         steps: ['diag','lube','wheels','detail'],           q: [8,20],  work: 4,   mat: 32,  price: 100, rep: 18,  g: 2 },
+  { id: 'clutch',     icon: '⚙️', name: 'Výměna spojky',                  steps: ['diag','engine'],                           q: [2,6],   work: 6,   mat: 95,  price: 250, rep: 25,  g: 2 },
+  { id: 'full_ac',    icon: '🧊', name: 'Servis klimatizace a elektroniky', steps: ['diag','ac','elec'],                      q: [3,8],   work: 5,   mat: 42,  price: 155, rep: 30,  g: 3 },
+  { id: 'timing',     icon: '⛓️', name: 'Rozvody a olej v motoru',        steps: ['diag','engine','lube'],                    q: [2,6],   work: 7,   mat: 125, price: 340, rep: 35,  g: 3 },
+  { id: 'big_service',icon: '🚗', name: 'Velký servis vozu',              steps: ['diag','lube','brakes','wheels','detail'],  q: [3,8],   work: 6,   mat: 72,  price: 270, rep: 45,  g: 3 },
+  { id: 'overhaul',   icon: '🏎️', name: 'Generální oprava motoru',        steps: ['diag','engine','elec','lube'],             q: [1,4],   work: 12,  mat: 310, price: 920, rep: 70,  g: 4 },
+  { id: 'restore',    icon: '👑', name: 'Kompletní renovace vozu',        steps: ['diag','engine','brakes','elec','ac','detail'], q: [1,3], work: 16, mat: 520, price: 1750, rep: 110, g: 6 }
+);
+PRODUCTS.forEach(p => { p.ind = STEPS[p.steps[0]].ind; });
 const PROD = Object.fromEntries(PRODUCTS.map(p => [p.id, p]));
 
 const UPGRADES = [
   { id: 'click',    name: 'Lepší nářadí',          desc: '+1 k ruční práci za klepnutí',                         max: 20, cost: l => Math.round(60 * Math.pow(1.9, l)) },
   { id: 'slots',    name: 'Větší dílna',           desc: '+1 zakázka zpracovávaná současně',                     max: 6,  cost: l => Math.round(400 * Math.pow(3, l)) },
   { id: 'sales',    name: 'Obchodní zástupce',     desc: 'Víc poptávek a rychlejší příliv nových',               max: 5,  cost: l => Math.round(300 * Math.pow(2.8, l)) },
-  { id: 'supplier', name: 'Dodavatel plechu',      desc: 'Materiál o 5 % levnější',                              max: 8,  cost: l => Math.round(500 * Math.pow(2.4, l)) },
+  { id: 'supplier', name: 'Dodavatel materiálu',      desc: 'Materiál o 5 % levnější',                              max: 8,  cost: l => Math.round(500 * Math.pow(2.4, l)) },
   { id: 'eff',      name: 'Štíhlá výroba',         desc: 'Všechny stroje o 10 % rychlejší',                      max: 15, cost: l => Math.round(1200 * Math.pow(2.2, l)) }
 ];
 
@@ -300,7 +393,9 @@ HALLS.forEach(h => { h.area = h.w * h.h; });
 /* Obrázky strojů: složka podle operace + název stroje + .jpg (zkouší se i png, jpeg, webp a id stroje).
    Chybí-li obrázek, zobrazí se ikona operace. */
 const STEP_FOLDER = { cut: 'Rezani', bend: 'Ohybani', roll: 'Staceni', weld: 'Svarovani', fit: 'ZamecnickePrace',
-                      grind: 'Brouseni', powder: 'LakovaniPraskove', wet: 'LakovaniMokre', plate: 'PovrchoveUpravy' };
+                      grind: 'Brouseni', powder: 'LakovaniPraskove', wet: 'LakovaniMokre', plate: 'PovrchoveUpravy',
+                      diag: 'Diagnostika', wheels: 'Pneuservis', lube: 'OlejAKapaliny', brakes: 'BrzdyAPodvozek', engine: 'MotorAPrevodovka',
+                      elec: 'Autoelektrika', ac: 'Klimatizace', detail: 'Detailing' };
 
 /* ===================== PERSONÁL MIMO VÝROBU ===================== */
 const STAFF = {
@@ -379,6 +474,25 @@ const JOKES = {
   plate:  ['Pozink se rozhodl být duhový. {n} ks do lázně znovu.', 'Elox vyšel v barvě, kterou nikdo neobjednal ({n} ks).']
 };
 
+Object.assign(JOKES, {
+  car_any: [
+    '{who} utáhl šroub tak, že ho nikdo nedostane ven ({n} ks).',
+    'Zákazník trval na tom, že to „předtím cvakalo jinak“. {n} ks se dělá znovu.',
+    '{who} našel v motoru cizí rukavici. Nikdo neví, jak se tam dostala ({n} ks).',
+    'Kočka z vedlejší dílny se uvelebila pod kapotou. {n} ks to musí projít znovu.',
+    'Z auta zbylo po opravě pár dílů navíc. To se prý stává ({n} ks).'
+  ],
+  diag:   ['Tester ukazuje chybu, kterou auto nikdy nemělo ({n} ks).', '{who} četl kódy závad z jiného vozu ({n} ks).'],
+  wheels: ['Kolo se vyvážilo na úplně jiné auto ({n} ks).', 'Pneumatika vypadala dobře, jen byla obráceně ({n} ks).'],
+  lube:   ['Olej skončil všude, jen ne v motoru ({n} ks).', '{who} dolil olej do ostřikovače ({n} ks).'],
+  brakes: ['Brzdy sice drží, ale na opačné straně ({n} ks).', '{who} zapomněl na pružinku. Ta se našla až později ({n} ks).'],
+  engine: ['Z motoru zbyly dva šrouby, které „tam nebyly potřeba“ ({n} ks).', 'Rozvody si dohodly vlastní pořadí ({n} ks).'],
+  elec:   ['Vyměnil se špatný pojistkový článek, teď svítí rádio místo světel ({n} ks).', '{who} přepojil dva dráty a houkačka teď spouští stěrače ({n} ks).'],
+  ac:     ['Klimatizace fouká, ale hlavně teplo ({n} ks).', 'Chladivo uniklo spolu s dobrou náladou ({n} ks).'],
+  detail: ['Leštička udělala z laku zrcadlo, ale na špatném místě ({n} ks).', '{who} umyl auto i zevnitř. Včetně dokumentů ({n} ks).']
+});
+const jokePool = st => (JOKES[st] || []).concat(STEPS[st].ind === 'car' ? JOKES.car_any : JOKES.any);
+
 /* ===================== TECHNOLOGIE FIRMY ===================== */
 /* Firma začíná jen s řemeslem podle startu. Další technologii (operaci) lze odemknout
    při dostatečné reputaci za peníze. Index = počet už odemčených technologií. */
@@ -386,8 +500,24 @@ const TECH_LEVELS = [null, { rep: 5, cost: 1500 }, { rep: 15, cost: 5000 }, { re
                       { rep: 80, cost: 100000 }, { rep: 120, cost: 250000 }, { rep: 170, cost: 600000 }, { rep: 230, cost: 1500000 }];
 const RANKS = [[0, 'Začínající dílna'], [10, 'Malá firma'], [30, 'Zavedená firma'],
                [70, 'Regionální výrobce'], [150, 'Průmyslový podnik']];
-const techCount = () => STEP_ORDER.filter(s => G.techs[s]).length;
-const nextTech = () => TECH_LEVELS[techCount()] || null;     // null = vše odemčeno
+/* Střediska: hlavní firma (0) a až 4 specializované pobočky. Každé má vlastní halu, stroje, technologie
+   a rozmístění. Společné je vše ostatní: peníze, reputace, zakázky, dispečer, technolog, sklad a kancelář. */
+const SITE_MAX = 4;
+const SITE_COST = n => Math.round(30000 * Math.pow(3, n - 1));      // n = pořadí pobočky (1..4)
+const SITE_REP = n => [0, 30, 70, 120, 200][n];
+const SITE_BONUS = 1.25;                                              // pobočka je o 25 % rychlejší ve své specializaci
+const mkSite = (id, name, spec, machines, techs, ind) => ({ id, name, spec, ind: ind || (spec ? STEPS[spec].ind : 'metal'), hall: 0, machines, techs, layout: {} });
+function bindSite(g) {                         // g.machines / hall / techs / layout = data právě zobrazeného střediska
+  Object.defineProperty(g, 'cs', { value: 0, writable: true, enumerable: false, configurable: true });
+  for (const k of ['machines', 'hall', 'techs', 'layout'])
+    Object.defineProperty(g, k, { get() { return g.sites[g.cs][k]; }, set(v) { g.sites[g.cs][k] = v; }, enumerable: false, configurable: true });
+  return g;
+}
+const hasTech = step => G.sites.some(x => x.techs[step]);
+const totalOwned = mid => G.sites.reduce((n, x) => n + (x.machines[mid] || 0), 0);
+const siteInd = () => G.sites[G.cs].ind;
+const techCount = () => stepsOf(siteInd()).filter(s => G.techs[s]).length;
+const nextTech = () => stepsOf(siteInd()).every(s => G.techs[s]) ? null : (TECH_LEVELS[Math.max(1, techCount())] || null);   // null = vše odemčeno
 const rankName = () => RANKS.filter(r => G.rep >= r[0]).pop()[1];
 
 /* ===================== KOOPERACE ===================== */
@@ -584,8 +714,8 @@ let gridCell = 0;   // 0 = přizpůsobit šířce okna
 function hallItems() {
   const items = [], w = WAREHOUSES[G.wh];
   const of = OFFICES[G.office];
-  if (of.area) items.push({ kind: 'of', key: 'of', w: of.w, h: of.h, area: of.area, ord: -2, idx: 0 });
-  if (w.area) items.push({ kind: 'wh', key: 'wh', w: w.w, h: w.h, area: w.area, ord: -1, idx: 0 });
+  if (G.cs === 0 && of.area) items.push({ kind: 'of', key: 'of', w: of.w, h: of.h, area: of.area, ord: -2, idx: 0 });
+  if (G.cs === 0 && w.area) items.push({ kind: 'wh', key: 'wh', w: w.w, h: w.h, area: w.area, ord: -1, idx: 0 });
   MACHINES.forEach((m, mi) => {
     const n = G.machines[m.id] || 0;
     for (let i = 0; i < n; i++) items.push({ kind: 'm', key: m.id + ':' + i, m, idx: i, w: DIMS[m.tier][0], h: DIMS[m.tier][1], area: FOOTPRINT[m.tier], ord: mi });
@@ -624,7 +754,7 @@ function packHall(items, W, H, layout) {
   return { placed, failed };
 }
 function unitWorker(m, idx) {                  // pracovník na dané kusu stroje (nejlepší dostanou první kusy)
-  const ws = G.workers.filter(w => w.mid === m.id).sort((x, y) => workerFactor(y, m) - workerFactor(x, m));
+  const ws = G.workers.filter(w => w.mid === m.id && (w.site || 0) === G.cs).sort((x, y) => workerFactor(y, m) - workerFactor(x, m));
   return ws[idx] || null;
 }
 function cellPx(hl) {
@@ -741,32 +871,58 @@ const view = $('#view');
 
 function newState(startId, name) {
   const st = STARTS[startId];
-  return {
+  return bindSite({
     v: 4, start: startId, name: name || 'Moje dílna',
     money: st.money, rep: 0, totalEarned: 0, done: 0, failed: 0,
-    machines: Object.assign({}, st.machines), upg: {},
-    techs: Object.fromEntries((st.techs || STEP_ORDER).map(t => [t, true])),
+    sites: [mkSite(0, st.name, null, Object.assign({}, st.machines), Object.fromEntries((st.techs || stepsOf(st.ind || 'metal')).map(t => [t, true])), st.ind || 'metal')],
+    upg: {},
     orders: [], active: [], nextOrderId: 1, spawnTimer: 0,
-    hall: 0, wh: 0, office: 0, layout: {}, stock: 0, autoStock: 0, scrapped: 0,
+    wh: 0, office: 0, stock: 0, autoStock: 0, scrapped: 0,
     staff: { dispatcher: null, storekeeper: null, technologist: null },
     disp: defaultDisp(), dispTimer: 0, stockTimer: 0,
-    workers: [{ id: 1, name: randName(), tier: 'norm', mid: st.worker || null }], nextWorkerId: 2,
+    workers: [{ id: 1, name: randName(), tier: 'norm', mid: st.worker || null, site: 0 }], nextWorkerId: 2,
     last: Date.now(), playTime: 0, created: Date.now()
-  };
+  });
 }
 function sanitize(s) {
   if (!s || typeof s !== 'object' || s.v !== 4 || !STARTS[s.start]) return null;   // starší verze nejsou kompatibilní
   const d = newState(s.start, String(s.name || '').slice(0, 24));
-  Object.assign(d, s);
-  d.machines = Object.assign({}, s.machines);
+  const { machines: _m, hall: _h, techs: _t, layout: _l, sites: _s, cs: _c, ...rest } = s;   // data středisek se čistí níže
+  Object.assign(d, rest);
   d.upg = Object.assign({}, s.upg);
-  // starší uložené hry měly všechny technologie
-  d.techs = s.techs ? Object.assign({}, s.techs) : Object.fromEntries(STEP_ORDER.map(t => [t, true]));
   if (!Array.isArray(d.orders)) d.orders = [];
   if (!Array.isArray(d.active)) d.active = [];
   if (!Array.isArray(d.workers)) d.workers = [];
-  d.workers = d.workers.filter(w => w && WORKER[w.tier]).map(w => ({ id: w.id, name: String(w.name || '').slice(0, 20), tier: w.tier, mid: MACH[w.mid] ? w.mid : null }));
-  d.hall = Math.min(Math.max(0, d.hall | 0), HALLS.length - 1);
+  // střediska (starší hra: jedno středisko ze samostatných polí machines / hall / techs / layout)
+  const cleanLay = lay => {
+    const o = {};
+    if (lay && typeof lay === 'object') for (const k of Object.keys(lay)) {
+      const L = lay[k];
+      if (L && [L.x, L.y, L.w, L.h].every(Number.isInteger) && L.x >= 0 && L.y >= 0 && L.w > 0 && L.h > 0 && L.w <= 32 && L.h <= 32) o[k] = { x: L.x, y: L.y, w: L.w, h: L.h };
+    }
+    return o;
+  };
+  const src = Array.isArray(s.sites) && s.sites.length ? s.sites
+    : [{ name: STARTS[s.start].name, spec: null, hall: s.hall, machines: s.machines, layout: s.layout, ind: STARTS[s.start].ind || 'metal',
+         techs: s.techs || Object.fromEntries(stepsOf('metal').map(t => [t, true])) }];
+  d.sites = src.slice(0, 1 + SITE_MAX).map((x, i) => {
+    const m = {};
+    for (const k of Object.keys(x.machines || {})) if (MACH[k] && x.machines[k] > 0) m[k] = x.machines[k] | 0;
+    const t = {};
+    for (const k of STEP_ORDER) if (x.techs && x.techs[k]) t[k] = true;
+    const spec = i > 0 && STEPS[x.spec] ? x.spec : null;
+    if (spec) t[spec] = true;
+    const ind = INDUSTRIES[x.ind] ? x.ind : (i === 0 ? (STARTS[s.start].ind || 'metal') : (spec ? STEPS[spec].ind : 'metal'));
+    for (const k of Object.keys(t)) if (STEPS[k].ind !== ind) delete t[k];
+    for (const k of Object.keys(m)) if (STEPS[MACH[k].step].ind !== ind) delete m[k];
+    const site = mkSite(i, String(x.name || (spec ? 'Středisko: ' + STEPS[spec].name : STARTS[s.start].name)).slice(0, 30), spec, m, t, ind);
+    site.hall = Math.min(Math.max(0, x.hall | 0), HALLS.length - 1);
+    site.layout = cleanLay(x.layout);
+    return site;
+  });
+  d.cs = 0;
+  d.workers = d.workers.filter(w => w && WORKER[w.tier]).map(w => ({ id: w.id, name: String(w.name || '').slice(0, 20), tier: w.tier, mid: MACH[w.mid] ? w.mid : null,
+    site: Number.isInteger(w.site) && w.site >= 0 && w.site < d.sites.length ? w.site : 0 }));
   fixAssignments(d);
   d.staff = { dispatcher: null, storekeeper: null, technologist: null };
   for (const r of STAFF_ORDER) {
@@ -783,14 +939,10 @@ function sanitize(s) {
   if (!COOP_POLICY[d.disp.coop]) d.disp.coop = 'norm';
   d.disp.margin = Math.min(100, Math.max(0, +d.disp.margin || 0));
   d.scrapped = +d.scrapped || 0;
-  const lay = {};
-  if (s.layout && typeof s.layout === 'object') for (const k of Object.keys(s.layout)) {
-    const L = s.layout[k];
-    if (L && [L.x, L.y, L.w, L.h].every(Number.isInteger) && L.x >= 0 && L.y >= 0 && L.w > 0 && L.h > 0 && L.w <= 32 && L.h <= 32) lay[k] = { x: L.x, y: L.y, w: L.w, h: L.h };
-  }
-  d.layout = lay;
-  const used = MACHINES.reduce((n, m) => n + (d.machines[m.id] || 0) * FOOTPRINT[m.tier], 0) + WAREHOUSES[d.wh].area + OFFICES[d.office].area;
-  while (used > HALLS[d.hall].area && d.hall < HALLS.length - 1) d.hall++;   // rozměry haly se změnily
+  d.sites.forEach((x, i) => {                  // rozměry haly se mohly změnit
+    const used = MACHINES.reduce((n, m) => n + (x.machines[m.id] || 0) * FOOTPRINT[m.tier], 0) + (i === 0 ? WAREHOUSES[d.wh].area + OFFICES[d.office].area : 0);
+    while (used > HALLS[x.hall].area && x.hall < HALLS.length - 1) x.hall++;
+  });
   if (!(d.nextWorkerId > 0)) d.nextWorkerId = 1 + d.workers.reduce((m, w) => Math.max(m, w.id || 0), 0);
   if (![d.money, d.rep, d.last].every(Number.isFinite)) return null;
   return d;
@@ -819,50 +971,56 @@ const techSpeedBonus = () => G.staff.technologist ? TECH_SPEED[G.staff.technolog
 const storeBonus = () => storeOn() ? STORE_BONUS[G.staff.storekeeper.tier] : 0;
 const defectMult = () => G.staff.technologist ? TECH_DEFECT[G.staff.technologist.tier] : 1;
 const staffWagePerSec = () => STAFF_ORDER.reduce((n, r) => n + (G.staff[r] ? STAFF_PAY[G.staff[r].tier].wage : 0), 0);
-const speedMult = step => (1 + 0.1 * (G.upg.eff || 0)) * (1 + techSpeedBonus() + storeBonus()) * ((perk().speed && perk().speed[step]) || 1);
-const machineRate = m => m.rate * speedMult(m.step);
-const machineUnits = step => !G.techs[step] ? 0 : MACHINES.reduce((n, m) => n + (m.step === step ? (G.machines[m.id] || 0) : 0), 0);
+const siteBonus = (site, step) => site.id === 0 ? ((perk().speed && perk().speed[step]) || 1) : (site.spec === step ? SITE_BONUS : 1);
+const speedMult = (step, site) => (1 + 0.1 * (G.upg.eff || 0)) * (1 + techSpeedBonus() + storeBonus()) * siteBonus(site || G.sites[G.cs], step);
+const machineRate = (m, site) => m.rate * speedMult(m.step, site);
+const unitsIn = (site, step) => !site.techs[step] ? 0 : MACHINES.reduce((n, m) => n + (m.step === step ? (site.machines[m.id] || 0) : 0), 0);
+const machineUnits = step => G.sites.reduce((n, x) => n + unitsIn(x, step), 0);
 // stanice = stroj s přiřazeným pracovníkem; nejrychlejší první (dostanou nejstarší zakázky)
 function stationList(step) {
-  if (!G.techs[step]) return [];
-  const out = [], sm = speedMult(step);
-  for (const m of MACHINES) {
-    if (m.step !== step) continue;
-    const units = G.machines[m.id] || 0;
-    if (!units) continue;
-    const ws = G.workers.filter(w => w.mid === m.id)
-      .sort((x, y) => workerFactor(y, m) - workerFactor(x, m)).slice(0, units);
-    for (const w of ws) out.push({ rate: m.rate * sm * workerFactor(w, m), wage: WORKER[w.tier].wage, defect: DEFECT_BASE[m.tier] * WQ[w.tier] });
+  const out = [];
+  for (const site of G.sites) {
+    if (!site.techs[step]) continue;
+    const sm = speedMult(step, site);
+    for (const m of MACHINES) {
+      if (m.step !== step) continue;
+      const units = site.machines[m.id] || 0;
+      if (!units) continue;
+      const ws = G.workers.filter(w => w.mid === m.id && (w.site || 0) === site.id)
+        .sort((x, y) => workerFactor(y, m) - workerFactor(x, m)).slice(0, units);
+      for (const w of ws) out.push({ rate: m.rate * sm * workerFactor(w, m), wage: WORKER[w.tier].wage, defect: DEFECT_BASE[m.tier] * WQ[w.tier] });
+    }
   }
   return out.sort((x, y) => y.rate - x.rate);
 }
 const stationCount = step => stationList(step).length;
 const stepRate = step => stationList(step).reduce((r, s) => r + s.rate, 0);
-const assignedTo = (mid, exceptId) => G.workers.filter(w => w.mid === mid && w.id !== exceptId).length;
-const freeSlots = (mid, exceptId) => (G.machines[mid] || 0) - assignedTo(mid, exceptId);
+const assignedTo = (mid, exceptId, si) => G.workers.filter(w => w.mid === mid && (w.site || 0) === (si == null ? G.cs : si) && w.id !== exceptId).length;
+const freeSlots = (mid, exceptId, si) => { si = si == null ? G.cs : si; return (G.sites[si].machines[mid] || 0) - assignedTo(mid, exceptId, si); };
 function fixAssignments(g) {                   // pracovníci navíc (např. po prodeji stroje) zůstanou bez stroje
-  for (const m of MACHINES) {
-    const units = g.machines[m.id] || 0;
-    g.workers.filter(w => w.mid === m.id)
+  for (const site of g.sites) for (const m of MACHINES) {
+    const units = site.machines[m.id] || 0;
+    g.workers.filter(w => w.mid === m.id && (w.site || 0) === site.id)
       .sort((x, y) => workerFactor(y, m) - workerFactor(x, m)).slice(units).forEach(w => { w.mid = null; });
   }
 }
-function bestMachineForHire() {                // nejlepší stroj, který ještě nemá obsluhu
+function bestMachineForHire() {                // nejlepší stroj, který ještě nemá obsluhu: { site, mid } nebo null
   let best = null;
-  for (const m of MACHINES) {
-    if (!G.techs[m.step] || freeSlots(m.id) <= 0) continue;
-    if (!best || m.rate > best.rate) best = m;
+  for (const site of G.sites) for (const m of MACHINES) {
+    if (!site.techs[m.step] || freeSlots(m.id, undefined, site.id) <= 0) continue;
+    if (!best || m.rate > best.m.rate) best = { site: site.id, m };
   }
-  return best ? best.id : null;
+  return best ? { site: best.site, mid: best.m.id } : null;
 }
 const bestWorkerWithoutMachine = () => G.workers.filter(w => !w.mid)
   .sort((x, y) => WORKER[y.tier].speed - WORKER[x.tier].speed)[0] || null;
-const spaceUsed = () => MACHINES.reduce((n, m) => n + (G.machines[m.id] || 0) * FOOTPRINT[m.tier], 0) + WAREHOUSES[G.wh].area + OFFICES[G.office].area;
-const hallCap = () => HALLS[G.hall].area;
-const spaceFree = () => hallCap() - spaceUsed();
-const sellValue = m => Math.floor(0.5 * Math.ceil(m.price * Math.pow(1.15, Math.max(0, (G.machines[m.id] || 1) - 1))));
+const spaceUsed = si => { si = si == null ? G.cs : si; const x = G.sites[si];
+  return MACHINES.reduce((n, m) => n + (x.machines[m.id] || 0) * FOOTPRINT[m.tier], 0) + (si === 0 ? WAREHOUSES[G.wh].area + OFFICES[G.office].area : 0); };
+const hallCap = si => HALLS[G.sites[si == null ? G.cs : si].hall].area;
+const spaceFree = si => hallCap(si) - spaceUsed(si);
+const sellValue = m => Math.floor(0.5 * Math.ceil(m.price * Math.pow(1.15, Math.max(0, (totalOwned(m.id) || 1) - 1))));
 const hireCost = tier => Math.ceil(WORKER[tier].hire * Math.pow(1.3, G.workers.length));
-const machineCost = m => Math.ceil(m.price * Math.pow(1.15, G.machines[m.id] || 0));
+const machineCost = m => Math.ceil(m.price * Math.pow(1.15, totalOwned(m.id)));
 const orderCost = o => Math.ceil(o.matBase * matMult());
 const rand = (a, b) => a + Math.random() * (b - a);
 
@@ -896,10 +1054,11 @@ function toast(msg, bad) {
 
 /* ===================== ZAKÁZKY ===================== */
 function genOrder() {
-  const avail = PRODUCTS.filter(p => p.rep <= G.rep);
+  const inds = new Set(G.sites.map(x => x.ind));
+  const avail = PRODUCTS.filter(p => p.rep <= G.rep && inds.has(p.ind));
   // vyšší tiery mají o něco větší šanci
   const weights = avail.map((p, i) => {
-    const own = p.steps.filter(st => G.techs[st]).length / p.steps.length;   // podíl vlastních operací
+    const own = p.steps.filter(st => hasTech(st)).length / p.steps.length;   // podíl vlastních operací
     return (1 + i * 0.15) * (0.3 + 2.7 * own);
   });
   let r = Math.random() * weights.reduce((a, b) => a + b, 0), idx = 0;
@@ -941,7 +1100,7 @@ function evalOrder(o, plan) {
       coop += q.cost; time += q.time; ok *= 1 - Math.min(0.06, COOP_DEFECT[opt] * defectMult());
     }
   }
-  const over = staffWagePerSec() * time / (G.active.length + 1);
+  const over = staffWagePerSec() * time / (mainCount() + 1);
   const cost = mat + coop + wage + over;
   return { mat, coop, wage, over, time, cost, profit: o.reward - cost, risk: 1 - ok };
 }
@@ -957,8 +1116,9 @@ function estHtml(o, plan) {
     <div class="small">Výroba asi ${fmtTime(ev.time)}${ev.time > o.deadline ? ' <span class="neg">⚠ nestihnete termín</span>' : ''} · riziko zmetku asi ${(ev.risk * 100).toFixed(1)} % kusů</div>`;
 }
 
+const mainCount = () => G.active.filter(x => !x.sub).length;     // podzakázky (přepracování) nezabírají místo v dílně
 function acceptOrder(o, plan) {
-  if (G.active.length >= slots()) return false;
+  if (mainCount() >= slots()) return false;
   const c = orderCost(o);
   if (!canPayMaterial(c)) return false;           // předem se platí jen materiál (ze zásoby, pak z peněz)
   payMaterial(c);
@@ -985,7 +1145,7 @@ function finishOrder(o) {
   toast(`✅ ${PROD[o.pid].name} ×${o.qty} hotovo: +${fmt(net)} Kč` + (bits.length ? ` (${bits.join(', ')})` : ''));
 }
 function failOrder(o) {
-  G.active = G.active.filter(x => x !== o);
+  G.active = G.active.filter(x => x !== o && x.parent !== o.id);
   G.failed++;
   G.rep = Math.max(0, G.rep - 3);
   toast(`⏰ Zakázka ${PROD[o.pid].name} propadla (−3 reputace)`, true);
@@ -997,25 +1157,52 @@ function rollDefects(pieces, p) { let d = 0; for (let i = 0; i < pieces; i++) if
 function finishStep(o, base) {
   o.prog = 0;
   const k = o.step;
-  if (o.redoTo >= 0) {                              // opravná smyčka: znovu se zmetky nehlídají
+  if (o.sub) {                                       // podzakázka na přepracování: znovu se zmetky nehlídají
+    o.step = k + 1;
+    if (o.step >= o.steps.length) o.done = true;
+    return;
+  }
+  if (o.redoTo >= 0) {                               // starší uložená hra: původní opravná smyčka
     if (k >= o.redoTo) { o.redoTo = -1; o.cw = o.work; o.pieces = o.qty; }
   } else {
     const d = rollDefects(o.pieces, Math.min(0.06, base * defectMult()));
-    if (d > 0) { scrapPieces(o, d, k); return; }
+    if (d > 0) spawnRework(o, d, k);
   }
   o.step = k + 1;
-  if (o.step >= o.steps.length) o.done = true;
+  if (o.pieces <= 0) o.step = o.steps.length;       // všechny kusy dopadly špatně, hlavní linka je u konce
+  if (o.step >= o.steps.length) { o.lineDone = true; if (!o.subs) o.done = true; }
 }
-function scrapPieces(o, d, k) {
+/* Zmetky vytvoří podzakázku: nový materiál a všechny operace od začátku až po tu, kde se to pokazilo.
+   Hlavní zakázka jede dál s dobrými kusy a na konci čeká, až se podzakázka dokončí. */
+function spawnRework(o, d, k) {
   const cost = Math.ceil(d * (o.matBase / o.qty) * matMult());
   o.scrap += d; o.scrapCost += cost; G.scrapped += d;
-  o.redoTo = k; o.step = 0; o.pieces = d;
-  o.cw = Math.max(0.5, o.work * d / o.qty);
+  o.pieces -= d;
+  o.cw = Math.max(0.5, o.work * Math.max(0, o.pieces) / o.qty);
+  o.subs = (o.subs || 0) + 1;
+  const f = d / o.qty;
+  G.active.push({ id: G.nextOrderId++, sub: true, parent: o.id, pid: o.pid, qty: d, pieces: d, redoTo: -1,
+                  work: o.work * f, cw: Math.max(0.5, o.work * f), reward: Math.round(o.reward * f), matBase: o.matBase * f,
+                  left: o.left, steps: o.steps.slice(0, k + 1), step: 0, prog: 0, done: false,
+                  coop: null, coopCost: 0, wageCost: 0, scrap: 0, scrapCost: 0, plan: o.plan });
   if (quiet) return;
   const who = G.workers.length ? G.workers[Math.floor(Math.random() * G.workers.length)].name : 'Někdo';
-  const st = o.steps[k], pool = (JOKES[st] || []).concat(JOKES.any);
+  const st = o.steps[k], pool = jokePool(st);
   const line = pool[Math.floor(Math.random() * pool.length)].replace(/\{who\}/g, who).replace(/\{n\}/g, d);
-  toast(`💥 ${STEPS[st].icon} ${line} (−${fmt(cost)} Kč)`, true);
+  toast(`💥 ${STEPS[st].icon} ${line} (−${fmt(cost)} Kč) · vznikla podzakázka na přepracování`, true);
+}
+/* Dokončené podzakázky předají náklady hlavní zakázce; hotové hlavní zakázky se vyplatí. */
+function settle() {
+  for (const sb of G.active.filter(x => x.sub && x.done)) {
+    G.active = G.active.filter(x => x !== sb);
+    const par = G.active.find(x => x.id === sb.parent);
+    if (!par) continue;
+    par.subs = Math.max(0, (par.subs || 1) - 1);
+    par.wageCost = (par.wageCost || 0) + (sb.wageCost || 0);
+    par.coopCost = (par.coopCost || 0) + (sb.coopCost || 0);
+    if (par.lineDone && !par.subs) par.done = true;
+  }
+  for (const o of G.active.filter(x => x.done && !x.sub)) finishOrder(o);
 }
 function applyWork(o, amt, defect) {
   const need = o.cw - o.prog;
@@ -1051,7 +1238,7 @@ function dispatchPick() {
   return best;
 }
 function autoAccept() {
-  if (!G.staff.dispatcher || G.active.length >= slots()) return;
+  if (!G.staff.dispatcher || mainCount() >= slots()) return;
   const pick = dispatchPick();
   if (pick && acceptOrder(pick.o, pick.plan)) toast(`🧑‍💼 Dispečer přijal: ${PROD[pick.o.pid].name} ×${pick.o.qty}`);
 }
@@ -1090,7 +1277,7 @@ function tick(dt, offline) {
   for (const st of STEP_ORDER) {
     const sts = stationList(st);
     if (!sts.length) continue;
-    const queue = G.active.filter(o => !o.coop && !o.done && o.steps[o.step] === st);
+    const queue = G.active.filter(o => !o.coop && !o.done && o.steps[o.step] === st).sort((a, b) => (b.sub ? 1 : 0) - (a.sub ? 1 : 0));   // přepracování má přednost
     const k = Math.min(sts.length, queue.length);
     for (let i = 0; i < k; i++) {
       const o = queue[i], s = sts[i];
@@ -1103,15 +1290,16 @@ function tick(dt, offline) {
 
   // režie: mzdy personálu mimo výrobu se rozpočítají do rozpracovaných zakázek
   const ow = staffWagePerSec();
-  if (ow > 0 && G.active.length) {
-    const share = ow * dt / G.active.length;
-    for (const o of G.active) o.wageCost = (o.wageCost || 0) + share;
+  if (ow > 0 && mainCount()) {
+    const share = ow * dt / mainCount();
+    for (const o of G.active) if (!o.sub) o.wageCost = (o.wageCost || 0) + share;
   }
-  for (const o of G.active.filter(x => x.done)) finishOrder(o);
+  settle();
 
   // termíny běží jen při aktivní hře (offline jsou zmrazené)
   if (!offline) {
     for (const o of G.active.slice()) {
+      if (o.sub) continue;
       o.left -= dt;
       if (o.left <= 0) failOrder(o);
     }
@@ -1240,13 +1428,14 @@ function buildOrders() {
       ${needSteps(o).length ? `<div class="small" style="margin-top:6px">🤝 U kroků bez obsazené stanice (stroj + člověk) zvolíte kooperaci, odhad počítá s normální.</div>` : ''}
     </div>`;
   }
-  const next = PRODUCTS.filter(p => p.rep > Math.floor(G.rep)).sort((a, b) => a.rep - b.rep)[0];
+  const inds = new Set(G.sites.map(x => x.ind));
+  const next = PRODUCTS.filter(p => p.rep > Math.floor(G.rep) && inds.has(p.ind)).sort((a, b) => a.rep - b.rep)[0];
   if (next) h += `<div class="hint">🔒 Další typ zakázek se odemkne při reputaci <b>${next.rep}</b>.</div>`;
   return h;
 }
 function updateOrders() {
   const s = view.querySelector('[data-slots]');
-  if (s) s.textContent = `${G.active.length} / ${slots()}`;
+  if (s) s.textContent = `${mainCount()} / ${slots()}`;
   view.querySelectorAll('[data-oid]').forEach(card => {
     const o = G.orders.find(x => x.id == card.dataset.oid);
     const est = card.querySelector('[data-est]');
@@ -1257,7 +1446,7 @@ function updateOrders() {
   view.querySelectorAll('[data-act="accept"]').forEach(b => {
     const o = G.orders.find(x => x.id == b.dataset.id);
     if (!o) return;
-    const full = G.active.length >= slots();
+    const full = mainCount() >= slots();
     const poor = !canPayMaterial(orderCost(o));
     b.disabled = full || poor;
     const txt = full ? 'Dílna je plná' : poor ? 'Chybí peníze na materiál'
@@ -1272,13 +1461,13 @@ function buildProd() {
   if (!G.active.length) h += `<div class="empty">Žádná rozpracovaná zakázka.<br>Vyberte nějakou v záložce Zakázky.</div>`;
   for (const o of G.active) {
     const p = PROD[o.pid];
-    h += `<div class="card" data-aid="${o.id}">
-      <div class="row"><b>${p.icon} ${p.name}</b><span class="tag">×${o.qty}</span></div>
+    h += `<div class="card${o.sub ? ' sub' : ''}" data-aid="${o.id}">
+      <div class="row"><b>${o.sub ? '🔁 Přepracování: ' : ''}${p.icon} ${p.name}</b><span class="tag">×${o.qty}</span></div>
       <div class="chips">${o.steps.map((s, i) => `<span class="chip" data-i="${i}">${STEPS[s].icon} ${STEPS[s].name}</span>`).join('')}</div>
       <div class="bar"><i data-bar></i></div>
       <div class="row small">
         <span data-pct></span>
-        <span>Odměna <b>${fmt(o.reward)} Kč</b></span>
+        ${o.sub ? '<span>Podzakázka</span>' : `<span>Odměna <b>${fmt(o.reward)} Kč</b></span>`}
         <span>Zbývá <b data-left></b></span>
       </div>
       <div class="small neg" style="margin-top:6px" data-scrap></div>
@@ -1301,29 +1490,33 @@ function updateProd() {
     const pct = o.coop ? Math.min(100, (1 - o.coop.left / o.coop.total) * 100)
                        : Math.min(100, o.prog / o.cw * 100);
     bar.style.width = pct + '%';
-    const redo = o.redoTo >= 0 ? '🔁 ' : '';
+    const redo = o.redoTo >= 0 || o.sub ? '🔁 ' : '';
     let label;
-    if (!st) label = 'Hotovo';
+    if (!st && o.lineDone && o.subs) label = `⏳ Čeká na přepracování (${G.active.filter(x => x.parent === o.id).reduce((n, x) => n + x.qty, 0)} ks)`;
+    else if (!st) label = 'Hotovo';
     else if (o.coop) label = `${redo}🤝 ${STEPS[st].name} u dodavatele: ${fmtTime(o.coop.left)}`;
     else if (isPending(o)) label = `${redo}${STEPS[st].name}: čeká na kooperaci`;
     else {
       const sc = stationCount(st);
-      const idx = G.active.filter(x => !x.coop && !x.done && x.steps[x.step] === st).indexOf(o);
+      const idx = G.active.filter(x => !x.coop && !x.done && x.steps[x.step] === st).sort((a, b) => (b.sub ? 1 : 0) - (a.sub ? 1 : 0)).indexOf(o);
       label = sc === 0 ? `${redo}${STEPS[st].name}: ruční práce – ${Math.floor(pct)} %`
         : idx < sc ? `${redo}${STEPS[st].name}: ${Math.floor(pct)} %`
         : `${redo}${STEPS[st].name}: čeká na volnou stanici (${Math.floor(pct)} %)`;
     }
     const pctEl = card.querySelector('[data-pct]');
     if (pctEl.textContent !== label) pctEl.textContent = label;
-    card.querySelector('[data-left]').textContent = fmtTime(o.left);
+    const par = o.sub ? G.active.find(x => x.id === o.parent) : null;
+    card.querySelector('[data-left]').textContent = fmtTime(par ? par.left : o.left);
     const sEl = card.querySelector('[data-scrap]');
-    const sTxt = o.scrap ? `⚠ Zmetků ${o.scrap} ks (−${fmt(o.scrapCost)} Kč za materiál)` + (o.redoTo >= 0 ? ` · přepracování ${o.pieces} ks` : '') : '';
+    const sTxt = o.sub ? 'Zmetky z hlavní zakázky se dělají znovu od začátku, hlavní zakázka na ně počká.'
+      : o.scrap ? `⚠ Zmetků ${o.scrap} ks (−${fmt(o.scrapCost)} Kč za materiál)` + (o.redoTo >= 0 ? ` · přepracování ${o.pieces} ks` : '') : '';
     if (sEl.textContent !== sTxt) sEl.textContent = sTxt;
     const mb = card.querySelector('[data-main]');
     let act, txt, dis = false;
     if (o.coop) { act = 'none'; txt = '🤝 Kooperace běží…'; dis = true; }
     else if (isPending(o)) { act = 'none'; txt = '🤝 Předávám dodavateli…'; dis = true; }
     else if (canManual(o)) { act = 'work'; txt = `⚒ Pracovat sám (+${clickPower()})`; }
+    else if (o.lineDone && o.subs) { act = 'none'; txt = '⏳ Čeká na přepracování'; dis = true; }
     else { act = 'none'; txt = 'Hotovo'; dis = true; }
     if (mb.dataset.act !== act) mb.dataset.act = act;
     if (mb.textContent !== txt) mb.textContent = txt;
@@ -1335,13 +1528,36 @@ function updateProd() {
   });
 }
 
+/* --- Střediska --- */
+function siteBarHtml() {
+  const n = G.sites.length - 1;
+  return `<div class="chips wide">${G.sites.map((x, i) =>
+    `<button class="chip${i === G.cs ? ' cur' : ''}" data-act="site" data-i="${i}">${i === 0 ? INDUSTRIES[x.ind].icon : STEPS[x.spec].icon} ${esc(x.name)}</button>`).join('')}
+    ${n < SITE_MAX ? `<button class="chip" data-act="siteadd">➕ Nové středisko</button>` : ''}</div>`;
+}
+function openSiteBuy() {
+  const n = G.sites.length;                          // pořadí nové pobočky
+  const cost = SITE_COST(n), rep = SITE_REP(n);
+  const taken = G.sites.map(x => x.spec);
+  $('#modal').hidden = false;
+  $('#modal').innerHTML = `<div class="mbox"><h3>➕ Nové středisko</h3>
+    <div class="small">Specializovaná pobočka s vlastní halou, stroji a lidmi, i v jiném oboru (třeba autoservis). Je o <b>25 % rychlejší</b> ve své specializaci a později odemkne další technologie svého oboru.
+      Peníze, reputace, zakázky, dispečer, technolog, sklad i kancelář zůstávají společné.
+      Cena <b>${fmt(cost)} Kč</b>, potřebná reputace <b>${rep}</b>.</div>
+    ${Object.keys(INDUSTRIES).map(ind => `<h3 style="margin:14px 0 4px">${INDUSTRIES[ind].icon} ${INDUSTRIES[ind].name}</h3>` +
+      stepsOf(ind).filter(st => !taken.includes(st)).map(st =>
+      `<button class="card pick opt" data-act="sitebuy" data-step="${st}"${G.rep < rep || G.money < cost ? ' disabled' : ''}>
+        <b>${STEPS[st].icon} ${STEPS[st].name}</b><span>${G.rep < rep ? `Potřeba ⭐ ${rep}` : G.money < cost ? 'Nedostatek peněz' : 'Založit středisko'}</span></button>`).join('')).join('')}
+    <button class="btn full ghost" data-act="coopclose">Zrušit</button></div>`;
+}
+
 /* --- Stroje --- */
 function buildMachines() {
-  let h = `<div class="card wide"><b>🏭 Hala</b> <span class="small" data-hall></span>
+  let h = siteBarHtml() + `<div class="card wide"><b>🏭 Hala</b> <span class="small" data-hall></span>
       <div class="bar"><i data-hall-bar></i></div></div>
-    <div class="hint">Každý stroj zabere místo v hale. Výkon stanice je <b>stroj × pracovník</b>: pracovníka
+    <div class="hint">${G.cs ? `Specializované středisko: ${STEPS[G.sites[G.cs].spec].name} je o 25 % rychlejší. ` : ''}Každý stroj zabere místo v hale. Výkon stanice je <b>stroj × pracovník</b>: pracovníka
     přiřadíte ke stroji v záložce Lidé. Další kus téhož stroje je o 15 % dražší.</div>`;
-  for (const st of STEP_ORDER) {
+  for (const st of stepsOf(siteInd())) {
     if (!G.techs[st]) {
       h += `<h2 class="sec">${STEPS[st].icon} ${STEPS[st].name} 🔒</h2>
         <div class="card small wide">Technologii nemáte. Rozšíření firmy najdete v záložce Firma, do té doby kooperujete.</div>`;
@@ -1417,13 +1633,13 @@ function buildWorkers() {
       <div class="small">${t.desc} · rychlost ×${t.speed} · mzda ${Math.round(t.wage * 60)} Kč/min práce</div></div>
       <button class="btn" data-act="hire" data-tier="${tier}"></button></div>`;
   }
-  const owned = MACHINES.filter(m => G.machines[m.id] > 0);
   h += `<h2 class="sec">Zaměstnanci (${G.workers.length})</h2>`;
   if (!G.workers.length) h += `<div class="empty">Nikoho nezaměstnáváte.</div>`;
   for (const w of G.workers) {
     const t = WORKER[w.tier];
-    const opts = owned.filter(m => G.techs[m.step] && (freeSlots(m.id, w.id) > 0 || w.mid === m.id))
-      .map(m => `<option value="${m.id}"${w.mid === m.id ? ' selected' : ''}>${STEPS[m.step].icon} ${m.name}</option>`).join('');
+    const opts = G.sites.map(site => MACHINES.filter(m => site.techs[m.step] && (site.machines[m.id] || 0) > 0 &&
+        (freeSlots(m.id, w.id, site.id) > 0 || (w.mid === m.id && (w.site || 0) === site.id)))
+      .map(m => `<option value="${site.id}|${m.id}"${w.mid === m.id && (w.site || 0) === site.id ? ' selected' : ''}>${G.sites.length > 1 ? esc(site.name) + ': ' : ''}${STEPS[m.step].icon} ${m.name}</option>`).join('')).join('');
     h += `<div class="card wk${w.mid ? ' ok' : ''}" data-wid="${w.id}">
       <div class="row"><b>${t.icon} ${esc(w.name)}</b><span class="tag">${t.name}</span></div>
       <label class="small">Pracuje na stroji
@@ -1448,7 +1664,7 @@ function updateWorkers() {
     const m = w.mid && MACH[w.mid];
     card.classList.toggle('ok', !!m);
     e.innerHTML = m
-      ? `Výkon <b>×${workerFactor(w, m).toFixed(2)}</b> → <b>${(machineRate(m) * workerFactor(w, m)).toFixed(2)}/s</b> · mzda ${Math.round(WORKER[w.tier].wage * 60)} Kč/min práce`
+      ? `Výkon <b>×${workerFactor(w, m).toFixed(2)}</b> → <b>${(machineRate(m, G.sites[w.site || 0]) * workerFactor(w, m)).toFixed(2)}/s</b> · mzda ${Math.round(WORKER[w.tier].wage * 60)} Kč/min práce`
       : 'Bez stroje – nepracuje a nestojí nic.';
   });
   view.querySelectorAll('[data-act="staff-hire"]').forEach(b => {
@@ -1469,10 +1685,12 @@ function updateWorkers() {
 
 /* --- Firma --- */
 function buildCompany() {
-  let h = `<h2 class="sec" style="margin-top:0">Plán haly</h2>
+  const site = G.sites[G.cs], hq = G.cs === 0;
+  let h = siteBarHtml() + `<h2 class="sec" style="margin-top:0">Plán haly: ${esc(site.name)}</h2>
     ${hallGridHtml()}
     <div class="card"><h3>🏢 ${esc(G.name)}</h3>
       <div class="small">${START.icon} ${START.name} · bonus: ${START.perkText}</div>
+      <div class="small">Střediska: <b>${G.sites.length}</b>${G.sites.length > 1 ? ' · ' + G.sites.slice(1).map(x => STEPS[x.spec].icon + ' ' + STEPS[x.spec].name + ' +25 %').join(', ') : ''}</div>
       <div class="row small block" data-cstats></div></div>
     <div class="card"><b data-hname></b>
       <div class="small" data-hinfo></div>
@@ -1483,7 +1701,8 @@ function buildCompany() {
            <button class="btn full" data-act="hall"></button>`
         : `<div class="small" style="margin-top:8px">Největší sídlo. Víc se do areálu nevejde.</div>`}
     </div>
-    <div class="card"><b data-oname></b>
+    ${hq ? '' : `<div class="card"><b>📦 Sklad a 🗂️ kancelář</b><div class="small">Jsou společné pro všechna střediska a stojí v hlavní firmě. Dispečer a technolog řídí všechna střediska.</div></div>`}
+    ${hq ? `<div class="card"><b data-oname></b>
       <div class="small" data-oinfo></div>
       <div class="small" style="margin-top:6px">Dispečer a technolog potřebují kancelář. Dispečer od úrovně 1, technolog od úrovně 2, zkušený pracovník vždy o úroveň víc.</div>
       ${OFFICES[G.office + 1]
@@ -1491,8 +1710,8 @@ function buildCompany() {
             reputace ${OFFICES[G.office + 1].rep} · ${fmt(OFFICES[G.office + 1].cost)} Kč</div>
            <button class="btn full" data-act="ofup"></button>`
         : `<div class="small" style="margin-top:8px">Největší kancelář.</div>`}
-    </div>
-    <div class="card"><b data-wname></b>
+    </div>` : ''}
+    ${hq ? `<div class="card"><b data-wname></b>
       <div class="small" data-winfo></div>
       <div class="bar"><i data-wbar></i></div>
       <div class="small" data-wnote style="margin-top:6px"></div>
@@ -1506,9 +1725,11 @@ function buildCompany() {
         <label class="small">Automatické doplňování zásoby
           <select data-autostock>${[[0, 'Vypnuto'], [0.25, 'na 25 % kapacity'], [0.5, 'na 50 % kapacity'], [0.75, 'na 75 % kapacity']]
             .map(([v, l]) => `<option value="${v}"${G.autoStock === v ? ' selected' : ''}>${l}</option>`).join('')}</select></label>` : ''}
-    </div>
+    </div>` : ''}
     <h2 class="sec">Technologie firmy</h2>`;
-  for (const st of STEP_ORDER) {
+  if (!hq) h += `<div class="card slim wide"><div><b>${STEPS[site.spec].icon} ${STEPS[site.spec].name}: specializace střediska</b>
+      <div class="small">O 25 % rychlejší ve své specializaci. Můžete odemknout i další technologie oboru ${esc(INDUSTRIES[site.ind].name)}.</div></div></div>`;
+  for (const st of stepsOf(site.ind)) {
     h += `<div class="card slim"><div><b>${STEPS[st].icon} ${STEPS[st].name}</b>
       <div class="small">${G.techs[st] ? '✅ Odemčeno' : '🔒 Zatím kooperujete'}</div></div></div>`;
   }
@@ -1519,7 +1740,7 @@ function buildCompany() {
   } else {
     h += `<div class="hint">Další technologie vyžaduje reputaci <b>${nt.rep}</b> a <b>${fmt(nt.cost)} Kč</b>.
       Vybíráte, kterou operaci odemknete.</div>`;
-    for (const st of STEP_ORDER.filter(t => !G.techs[t])) {
+    for (const st of stepsOf(site.ind).filter(t => !G.techs[t])) {
       h += `<div class="card slim"><div><b>${STEPS[st].icon} ${STEPS[st].name}</b>
         <div class="small">Pak potřebujete místo v hale, stroje a lidi</div></div>
         <button class="btn" data-act="tech" data-step="${st}"></button></div>`;
@@ -1539,9 +1760,9 @@ function updateCompany() {
       (total ? ` · úspěšnost <b>${Math.round(G.done / total * 100)} %</b>` : '') + `<br>` +
       `Celkem vyděláno: <b>${fmt(G.totalEarned)} Kč</b>` +
       (G.done ? ` · průměr na zakázku <b>${fmt(G.totalEarned / G.done)} Kč</b>` : '') + `<br>` +
-      `Sídlo: <b>${HALLS[G.hall].name}</b> · hala <b>${spaceUsed()} / ${hallCap()} m²</b><br>` +
+      `Sídlo (${esc(G.sites[G.cs].name)}): <b>${HALLS[G.hall].name}</b> · hala <b>${spaceUsed()} / ${hallCap()} m²</b><br>` +
       `Zaměstnanci: <b>${G.workers.length}</b> · stroje: <b>${units}</b> · stanice: <b>${stations}</b><br>` +
-      `Technologie: <b>${techCount()} / ${STEP_ORDER.length}</b> · čas hry: <b>${fmtDur(G.playTime)}</b><br>` +
+      `Technologie střediska: <b>${techCount()} / ${stepsOf(siteInd()).length}</b> · čas hry: <b>${fmtDur(G.playTime)}</b><br>` +
       `Personál mimo výrobu: <b>${STAFF_ORDER.filter(r => G.staff[r]).length} / ${STAFF_ORDER.length}</b> · zmetků celkem: <b>${G.scrapped} ks</b>`;
   }
   const hn = view.querySelector('[data-hname]');
@@ -1689,14 +1910,15 @@ view.addEventListener('click', e => {
     else if (acceptOrder(o)) { toast('📥 Zakázka přijata'); renderView(true); renderHeader(); }
   } else if (act === 'work') {
     const o = G.active.find(x => x.id == id);
-    if (o && canManual(o)) { applyWork(o, clickPower()); if (o.done) finishOrder(o); renderView(false); renderHeader(); }
+    if (o && canManual(o)) { applyWork(o, clickPower()); settle(); renderView(false); renderHeader(); }
   } else if (act === 'hire') {
     const tier = b.dataset.tier, c = hireCost(tier);
     if (WORKER[tier] && G.money >= c) {
       G.money -= c;
-      const w = { id: G.nextWorkerId++, name: randName(), tier, mid: bestMachineForHire() };
+      const bm = bestMachineForHire();
+      const w = { id: G.nextWorkerId++, name: randName(), tier, mid: bm ? bm.mid : null, site: bm ? bm.site : 0 };
       G.workers.push(w);
-      toast(w.mid ? `${WORKER[tier].icon} ${w.name} nastoupil na stroj: ${MACH[w.mid].name}`
+      toast(w.mid ? `${WORKER[tier].icon} ${w.name} nastoupil na stroj: ${MACH[w.mid].name}${G.sites.length > 1 ? ' (' + G.sites[w.site].name + ')' : ''}`
                   : `${WORKER[tier].icon} ${w.name} nastoupil (zatím bez stroje)`);
       renderView(true); renderHeader();
     }
@@ -1713,7 +1935,7 @@ view.addEventListener('click', e => {
     moveSel(null);
   } else if (act === 'gridcell') {
     if (gridEdit && gridSel) {
-      const r = b.getBoundingClientRect(), c = gridCell + 0;
+      const r = b.getBoundingClientRect(), c = r.width / HALLS[G.hall].w;
       moveSel({ cx: Math.floor((e.clientX - r.left) / c), cy: Math.floor((e.clientY - r.top) / c) });
     }
   } else if (act === 'gridsel') {
@@ -1744,6 +1966,10 @@ view.addEventListener('click', e => {
   } else if (act === 'stockbuy') {
     const amt = b.dataset.amt === 'max' ? 1e12 : +b.dataset.amt;
     if (buyStock(amt) > 0) { renderView(false); renderHeader(); }
+  } else if (act === 'site') {
+    G.cs = Math.min(G.sites.length - 1, Math.max(0, +b.dataset.i)); gridSel = null; renderView(true);
+  } else if (act === 'siteadd') {
+    openSiteBuy();
   } else if (act === 'ofup') {
     const n = OFFICES[G.office + 1];
     if (n && G.rep >= n.rep && G.money >= n.cost && spaceFree() >= n.area - OFFICES[G.office].area) {
@@ -1760,7 +1986,7 @@ view.addEventListener('click', e => {
     }
   } else if (act === 'tech') {
     const nt = nextTech(), st = b.dataset.step;
-    if (nt && STEPS[st] && !G.techs[st] && G.rep >= nt.rep && G.money >= nt.cost) {
+    if (nt && STEPS[st] && STEPS[st].ind === siteInd() && !G.techs[st] && G.rep >= nt.rep && G.money >= nt.cost) {
       G.money -= nt.cost; G.techs[st] = true;
       toast(`🏢 Firma se rozšířila o technologii: ${STEPS[st].name}`);
       renderView(true); renderHeader();
@@ -1770,7 +1996,7 @@ view.addEventListener('click', e => {
     if (G.techs[m.step] && G.money >= c && spaceFree() >= FOOTPRINT[m.tier]) {
       G.money -= c; G.machines[id] = (G.machines[id] || 0) + 1;
       const free = bestWorkerWithoutMachine();
-      if (free) free.mid = id;                    // volný pracovník rovnou nastoupí na nový stroj
+      if (free) { free.mid = id; free.site = G.cs; }   // volný pracovník rovnou nastoupí na nový stroj
       renderView(false); renderHeader();
     } else if (spaceFree() < FOOTPRINT[m.tier]) toast('Hala je plná – rozšiřte sídlo v záložce Firma', true);
   } else if (act === 'sell') {
@@ -1819,7 +2045,7 @@ view.addEventListener('click', e => {
   } else if (act === 'cheatrep') {
     G.rep += 25; renderHeader(); renderView(false);
   } else if (act === 'cheattech') {
-    for (const st of STEP_ORDER) G.techs[st] = true;
+    for (const st of stepsOf(siteInd())) G.techs[st] = true;
     renderView(true);
   } else if (act === 'imgcheck') {
     const out = view.querySelector('[data-imgres]');
@@ -1877,9 +2103,9 @@ view.addEventListener('change', e => {
   if (!sel || !G) return;
   const w = G.workers.find(x => x.id == sel.dataset.assign);
   if (!w) return;
-  const mid = sel.value;
-  if (!mid) w.mid = null;
-  else if (MACH[mid] && G.techs[MACH[mid].step] && freeSlots(mid, w.id) > 0) w.mid = mid;
+  const [si, mid] = sel.value.split('|'), site = G.sites[+si];
+  if (!mid) { w.mid = null; }
+  else if (site && MACH[mid] && site.techs[MACH[mid].step] && freeSlots(mid, w.id, site.id) > 0) { w.mid = mid; w.site = site.id; }
   renderView(true);
 });
 $('#modal').addEventListener('click', e => {
@@ -1888,7 +2114,16 @@ $('#modal').addEventListener('click', e => {
   const b = e.target.closest('[data-act]');
   if (!b || b.disabled) return;
   const act = b.dataset.act;
-  if (act === 'coopclose') {
+  if (act === 'sitebuy') {
+    const n = G.sites.length, st = b.dataset.step;
+    if (n - 1 < SITE_MAX && STEPS[st] && !G.sites.some(x => x.spec === st) && G.rep >= SITE_REP(n) && G.money >= SITE_COST(n)) {
+      G.money -= SITE_COST(n);
+      G.sites.push(mkSite(n, 'Středisko: ' + STEPS[st].name, st, {}, { [st]: true }, STEPS[st].ind));
+      G.cs = n; gridSel = null;
+      toast(`🏭 Nové středisko: ${STEPS[st].name}`);
+      closeCoop(); renderView(true); renderHeader();
+    }
+  } else if (act === 'coopclose') {
     closeCoop();
   } else if (act === 'confyes') {
     const cb = confirmCb; closeCoop();
@@ -1917,15 +2152,16 @@ function showStart() {
   el.hidden = false;
   el.innerHTML = `<div class="start-box">
     <h1>🏭 Plechárna</h1>
-    <p class="small">Idle hra o výrobě z tenkých plechů. Z malé dílny postavíte továrnu.</p>
+    <p class="small">Idle hra o výrobě a servisu. Z malé dílny postavíte firmu s více středisky a obory.</p>
     <label class="small">Název vaší firmy
-      <input type="text" id="nameInput" maxlength="24" placeholder="Např. Plechy Novák"></label>
+      <input type="text" id="nameInput" maxlength="24" placeholder="Např. Dílna Novák"></label>
     <h3>Čím chcete začít?</h3>
-    ${Object.entries(STARTS).map(([id, s]) => `
+    ${Object.entries(INDUSTRIES).map(([ind, d]) => `<h3 style="margin:16px 0 4px">${d.icon} ${d.name}</h3><div class="small">${d.desc}</div>` +
+      Object.entries(STARTS).filter(([, x]) => (x.ind || 'metal') === ind).map(([id, x]) => `
       <button class="card pick" data-start="${id}">
-        <b>${s.icon} ${s.name}</b><span>${s.desc}</span>
-        <em>${s.perkText} · start ${s.money} Kč</em>
-      </button>`).join('')}
+        <b>${x.icon} ${x.name}</b><span>${x.desc}</span>
+        <em>${x.perkText} · start ${x.money} Kč</em>
+      </button>`).join('')).join('')}
   </div>`;
 }
 $('#start').addEventListener('click', e => {
