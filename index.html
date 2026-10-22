@@ -166,10 +166,19 @@ Object.assign(STEPS, {                           // autoservis
   ac:     { name: 'Klimatizace',             icon: '❄️', ind: 'car' },
   detail: { name: 'Mytí a detailing',        icon: '🧽', ind: 'car' }
 });
+/* t = slovník oboru: jak se v textech říká jednotce, materiálu, zmetkům apod. */
 const INDUSTRIES = {
-  metal: { name: 'Kovovýroba', icon: '🏭', desc: 'Výroba dílů z tenkých plechů.' },
-  car:   { name: 'Autoservis', icon: '🚗', desc: 'Opravy a údržba osobních aut.' }
+  metal: { name: 'Kovovýroba', icon: '🏭', desc: 'Výroba dílů z tenkých plechů.',
+    t: { tab: 'Výroba', mat: 'materiál', matIn: 'materiálu', matFor: 'materiál', defects: 'Zmetky', defectsLow: 'zmetky', defectsOf: 'Zmetků', redo: 'Přepracování', redoWord: 'přepracování',
+         full: 'Dílna je plná', prod: 'výroby', ok: 'Zisk při bezchybné výrobě', risk: 'riziko zmetku asi {p} % kusů', unit: n => `${n} ks`,
+         subNote: 'Zmetky z hlavní zakázky se dělají znovu od začátku, hlavní zakázka na ně počká.', subToast: 'vznikla podzakázka na přepracování' } },
+  car:   { name: 'Autoservis', icon: '🚗', desc: 'Opravy a údržba osobních aut.',
+    t: { tab: 'Servis', mat: 'díly', matIn: 'dílů', matFor: 'díly a materiál', defects: 'Reklamace', defectsLow: 'reklamace', defectsOf: 'Reklamací', redo: 'Reklamace', redoWord: 'oprava znovu',
+         full: 'Všechna stání jsou obsazená', prod: 'servisu', ok: 'Zisk při bezchybné práci', risk: 'riziko reklamace asi {p} % vozů', unit: n => `${n} ${n === 1 ? 'vůz' : n < 5 ? 'vozy' : 'vozů'}`,
+         subNote: 'Reklamované vozy se opravují znovu od začátku, hlavní zakázka na ně počká.', subToast: 'vůz se vrátil na reklamaci' } }
 };
+const TM = ind => INDUSTRIES[ind || 'metal'].t;                       // slovník oboru
+const pInd = pid => PROD[pid].ind;
 const STEP_ORDER = ['cut', 'bend', 'roll', 'weld', 'fit', 'grind', 'powder', 'wet', 'plate',
                     'diag', 'wheels', 'lube', 'brakes', 'engine', 'elec', 'ac', 'detail'];
 const stepsOf = ind => STEP_ORDER.filter(st => STEPS[st].ind === ind);
@@ -421,8 +430,8 @@ function staffEffect(role, t) {
   if (role === 'storekeeper') return `sleva ${pct0(STORE_DISC[t])} % při nákupu materiálu, výroba +${pct0(STORE_BONUS[t])} % (plynulé zásobování)`;
   return `výroba o ${pct0(TECH_SPEED[t])} % rychlejší, zmetků o ${pct0(1 - TECH_DEFECT[t])} % méně`;
 }
-const PRIO_NAMES = { profit: 'Nejvyšší zisk', rate: 'Nejvyšší zisk za čas', margin: 'Nejvyšší marže', own: 'Nejvíc vlastní výroby' };
-const COOP_POLICY = { never: 'Nikdy (jen vlastní výroba)', slow: 'Jen pomalu a levně', norm: 'Normálně', fast: 'Rychle, když je potřeba' };
+const PRIO_NAMES = { profit: 'Nejvyšší zisk', rate: 'Nejvyšší zisk za čas', margin: 'Nejvyšší marže', own: 'Nejvíc vlastní práce' };
+const COOP_POLICY = { never: 'Nikdy (jen vlastní práce)', slow: 'Jen pomalu a levně', norm: 'Normálně', fast: 'Rychle, když je potřeba' };
 const defaultDisp = () => ({ prio: 'profit', margin: 0, coop: 'norm', svc: true, mid: true, big: true, safe: true });
 
 /* ===================== SKLAD ===================== */
@@ -457,41 +466,41 @@ const WQ = { slow: 1.3, norm: 1, fast: 0.7 };          // zkušenost pracovníka
 const COOP_DEFECT = { fast: 0.01, norm: 0.02, slow: 0.03 };
 const JOKES = {
   any: [
-    '{who} tvrdí, že to byl záměr. Zákazník asi ne ({n} ks).',
-    'Výkres byl vzhůru nohama. {n} ks si dá repete.',
-    '{who} se spletl o desetinnou čárku. {n} ks je teď spíš sochařské dílo.',
-    'Někdo vyměnil mm za palce. {n} ks je tedy trochu jiná velikost.',
-    'Díl se zaryl do podlahy a už nechtěl ven ({n} ks).',
-    'Měřili jsme dvakrát, řezali jednou a stejně je to o 5 mm špatně ({n} ks).',
-    '{who} odběhl na kafe, stroj pracoval sám. Výsledek: abstraktní umění ({n} ks).'
+    '{who} tvrdí, že to byl záměr. Zákazník asi ne ({n}).',
+    'Výkres byl vzhůru nohama. {n} si dá repete.',
+    '{who} se spletl o desetinnou čárku. {n} je teď spíš sochařské dílo.',
+    'Někdo vyměnil mm za palce. {n} je tedy trochu jiná velikost.',
+    'Díl se zaryl do podlahy a už nechtěl ven ({n}).',
+    'Měřili jsme dvakrát, řezali jednou a stejně je to o 5 mm špatně ({n}).',
+    '{who} odběhl na kafe, stroj pracoval sám. Výsledek: abstraktní umění ({n}).'
   ],
-  cut:    ['Laser si dal pauzu na rozmyšlenou: {n} ks je kratších, než mělo být.', 'Nůžky řízly přesně tam, kde nemusely ({n} ks).'],
-  bend:   ['{who} ohnul plech na špatnou stranu. {n} ks putuje zpátky do hry.', 'Úhel 90°? Tohle je spíš 87° a dobrá vůle ({n} ks).'],
-  roll:   ['Z válce se vyklubala elipsa ({n} ks).', 'Zakružovačka to stočila do slimáka ({n} ks).'],
-  weld:   ['Svár drží jen díky dobré víře. {n} ks zpět na přepracování.', '{who} svařil víc, než mělo být. Teď je to jeden kus místo dvou ({n} ks).'],
-  fit:    ['Závit je levotočivý a nikdo to nečekal ({n} ks).', 'Vrták si šel vlastní cestou, {n} ks má díru navíc.'],
-  grind:  ['{who} to přebrousil tak, že lesk vidí i v noci. Škoda, že to je skrz ({n} ks).'],
-  powder: ['Kočka z vedlejší dílny si lehla na čerstvě lakované díly ({n} ks).', 'Barva v peci vyšla spíš do hněda než do červena ({n} ks).'],
-  wet:    ['Lak stekl v takových slzách, že by se kochal i malíř ({n} ks).', 'Moucha se zapsala do laku na věčné časy ({n} ks).'],
-  plate:  ['Pozink se rozhodl být duhový. {n} ks do lázně znovu.', 'Elox vyšel v barvě, kterou nikdo neobjednal ({n} ks).']
+  cut:    ['Laser si dal pauzu na rozmyšlenou: {n} je kratších, než mělo být.', 'Nůžky řízly přesně tam, kde nemusely ({n}).'],
+  bend:   ['{who} ohnul plech na špatnou stranu. {n} putuje zpátky do hry.', 'Úhel 90°? Tohle je spíš 87° a dobrá vůle ({n}).'],
+  roll:   ['Z válce se vyklubala elipsa ({n}).', 'Zakružovačka to stočila do slimáka ({n}).'],
+  weld:   ['Svár drží jen díky dobré víře. {n} zpět na přepracování.', '{who} svařil víc, než mělo být. Teď je to jeden kus místo dvou ({n}).'],
+  fit:    ['Závit je levotočivý a nikdo to nečekal ({n}).', 'Vrták si šel vlastní cestou, {n} má díru navíc.'],
+  grind:  ['{who} to přebrousil tak, že lesk vidí i v noci. Škoda, že to je skrz ({n}).'],
+  powder: ['Kočka z vedlejší dílny si lehla na čerstvě lakované díly ({n}).', 'Barva v peci vyšla spíš do hněda než do červena ({n}).'],
+  wet:    ['Lak stekl v takových slzách, že by se kochal i malíř ({n}).', 'Moucha se zapsala do laku na věčné časy ({n}).'],
+  plate:  ['Pozink se rozhodl být duhový. {n} do lázně znovu.', 'Elox vyšel v barvě, kterou nikdo neobjednal ({n}).']
 };
 
 Object.assign(JOKES, {
   car_any: [
-    '{who} utáhl šroub tak, že ho nikdo nedostane ven ({n} ks).',
-    'Zákazník trval na tom, že to „předtím cvakalo jinak“. {n} ks se dělá znovu.',
-    '{who} našel v motoru cizí rukavici. Nikdo neví, jak se tam dostala ({n} ks).',
-    'Kočka z vedlejší dílny se uvelebila pod kapotou. {n} ks to musí projít znovu.',
-    'Z auta zbylo po opravě pár dílů navíc. To se prý stává ({n} ks).'
+    '{who} utáhl šroub tak, že ho nikdo nedostane ven ({n}).',
+    'Zákazník trval na tom, že to „předtím cvakalo jinak“. {n} se dělá znovu.',
+    '{who} našel v motoru cizí rukavici. Nikdo neví, jak se tam dostala ({n}).',
+    'Kočka z vedlejší dílny se uvelebila pod kapotou. {n} to musí projít znovu.',
+    'Z auta zbylo po opravě pár dílů navíc. To se prý stává ({n}).'
   ],
-  diag:   ['Tester ukazuje chybu, kterou auto nikdy nemělo ({n} ks).', '{who} četl kódy závad z jiného vozu ({n} ks).'],
-  wheels: ['Kolo se vyvážilo na úplně jiné auto ({n} ks).', 'Pneumatika vypadala dobře, jen byla obráceně ({n} ks).'],
-  lube:   ['Olej skončil všude, jen ne v motoru ({n} ks).', '{who} dolil olej do ostřikovače ({n} ks).'],
-  brakes: ['Brzdy sice drží, ale na opačné straně ({n} ks).', '{who} zapomněl na pružinku. Ta se našla až později ({n} ks).'],
-  engine: ['Z motoru zbyly dva šrouby, které „tam nebyly potřeba“ ({n} ks).', 'Rozvody si dohodly vlastní pořadí ({n} ks).'],
-  elec:   ['Vyměnil se špatný pojistkový článek, teď svítí rádio místo světel ({n} ks).', '{who} přepojil dva dráty a houkačka teď spouští stěrače ({n} ks).'],
-  ac:     ['Klimatizace fouká, ale hlavně teplo ({n} ks).', 'Chladivo uniklo spolu s dobrou náladou ({n} ks).'],
-  detail: ['Leštička udělala z laku zrcadlo, ale na špatném místě ({n} ks).', '{who} umyl auto i zevnitř. Včetně dokumentů ({n} ks).']
+  diag:   ['Tester ukazuje chybu, kterou auto nikdy nemělo ({n}).', '{who} četl kódy závad z jiného vozu ({n}).'],
+  wheels: ['Kolo se vyvážilo na úplně jiné auto ({n}).', 'Pneumatika vypadala dobře, jen byla obráceně ({n}).'],
+  lube:   ['Olej skončil všude, jen ne v motoru ({n}).', '{who} dolil olej do ostřikovače ({n}).'],
+  brakes: ['Brzdy sice drží, ale na opačné straně ({n}).', '{who} zapomněl na pružinku. Ta se našla až později ({n}).'],
+  engine: ['Z motoru zbyly dva šrouby, které „tam nebyly potřeba“ ({n}).', 'Rozvody si dohodly vlastní pořadí ({n}).'],
+  elec:   ['Vyměnil se špatný pojistkový článek, teď svítí rádio místo světel ({n}).', '{who} přepojil dva dráty a houkačka teď spouští stěrače ({n}).'],
+  ac:     ['Klimatizace fouká, ale hlavně teplo ({n}).', 'Chladivo uniklo spolu s dobrou náladou ({n}).'],
+  detail: ['Leštička udělala z laku zrcadlo, ale na špatném místě ({n}).', '{who} umyl auto i zevnitř. Včetně dokumentů ({n}).']
 });
 const jokePool = st => (JOKES[st] || []).concat(STEPS[st].ind === 'car' ? JOKES.car_any : JOKES.any);
 
@@ -590,7 +599,7 @@ function buildModal() {
   $('#modal').hidden = false;
   $('#modal').innerHTML = `<div class="mbox">
     <h3>🤝 Kooperace</h3>
-    <div class="small">${p.icon} ${p.name} ×${o.qty}: pro tyto kroky nemáte obsazenou stanici (stroj + člověk).
+    <div class="small">${p.icon} ${p.name} (${TM(p.ind).unit(o.qty)}): pro tyto kroky nemáte obsazenou stanici (stroj + člověk).
       Zvolte dodavatele, cena se strhne z odměny až po dokončení.</div>
     <button class="btn full" data-act="planok" style="margin-top:8px">Přijmout zakázku</button>
     <button class="btn full ghost" data-act="coopclose">Zrušit</button>
@@ -1072,13 +1081,16 @@ function genOrder() {
   let r = Math.random() * weights.reduce((a, b) => a + b, 0), idx = 0;
   for (; idx < weights.length - 1; idx++) { r -= weights[idx]; if (r <= 0) break; }
   const p = avail[idx];
-  const qty = Math.max(2, Math.round(rand(p.q[0], p.q[1]) * sizeMult()));
-  const work = qty * p.work;
+  let qty = Math.max(2, Math.round(rand(p.q[0], p.q[1]) * sizeMult())), vol = qty;
+  if (p.ind === 'car') {                             // servis: pár vozů (1–12), s reputací roste hlavně rozsah práce a cena za vůz
+    qty = Math.min(12, Math.max(1, Math.round(vol / 6)));
+  }
+  const work = vol * p.work;
   const totalWork = work * p.steps.length;
   return {
     id: G.nextOrderId++, pid: p.id, qty, work,
-    matBase: qty * p.mat,
-    reward: Math.round(qty * p.price * rand(0.9, 1.15)),
+    matBase: vol * p.mat,
+    reward: Math.round(vol * p.price * rand(0.9, 1.15)),
     deadline: Math.round(90 + totalWork * 4)
   };
 }
@@ -1112,16 +1124,17 @@ function evalOrder(o, plan) {
   const cost = mat + coop + wage + over;
   return { mat, wait, coop, wage, over, time, cost, profit: o.reward - cost, risk: 1 - ok };
 }
+const p0ind = o => PROD[o.pid].ind;
 function estHtml(o, plan) {
   const ev = evalOrder(o, plan);
   const pc = o.reward > 0 ? Math.round(ev.profit / o.reward * 100) : 0;
-  const parts = [`materiál ${fmt(ev.mat)}`];
+  const T = TM(p0ind(o)), parts = [`${T.mat} ${fmt(ev.mat)}`];
   if (ev.coop) parts.push(`kooperace ${fmt(ev.coop)}`);
   if (ev.wage >= 1) parts.push(`mzdy ${fmt(ev.wage)}`);
   if (ev.over >= 1) parts.push(`režie ${fmt(ev.over)}`);
   return `<div>Náklady <b>${fmt(ev.cost)} Kč</b> <span class="small">(${parts.join(' · ')})</span></div>
-    <div>Zisk při bezchybné výrobě: <b class="${ev.profit >= 0 ? 'pos' : 'neg'}">${ev.profit >= 0 ? '+' : '−'}${fmt(Math.abs(ev.profit))} Kč</b> (${pc} %)</div>
-    <div class="small">${ev.wait ? `📦 Dodání materiálu ${fmtTime(ev.wait)}` : '📦 Materiál ze skladu ihned'} · celkem asi ${fmtTime(ev.time)}${ev.time > o.deadline ? ' <span class="neg">⚠ nestihnete termín</span>' : ''} · riziko zmetku asi ${(ev.risk * 100).toFixed(1)} % kusů</div>`;
+    <div>${T.ok}: <b class="${ev.profit >= 0 ? 'pos' : 'neg'}">${ev.profit >= 0 ? '+' : '−'}${fmt(Math.abs(ev.profit))} Kč</b> (${pc} %)</div>
+    <div class="small">${ev.wait ? `📦 Dodání ${T.matIn} ${fmtTime(ev.wait)}` : `📦 ${T.mat[0].toUpperCase() + T.mat.slice(1)} ze skladu ihned`} · celkem asi ${fmtTime(ev.time)}${ev.time > o.deadline ? ' <span class="neg">⚠ nestihnete termín</span>' : ''} · ${T.risk.replace('{p}', (ev.risk * 100).toFixed(1))}</div>`;
 }
 
 const mainCount = () => G.active.filter(x => !x.sub).length;     // podzakázky (přepracování) nezabírají místo v dílně
@@ -1150,8 +1163,8 @@ function finishOrder(o) {
   const bits = [];
   if (cc) bits.push(`kooperace −${fmt(cc)}`);
   if (wc >= 1) bits.push(`mzdy −${fmt(wc)}`);
-  if (sc) bits.push(`zmetky −${fmt(sc)}`);
-  toast(`✅ ${PROD[o.pid].name} ×${o.qty} hotovo: +${fmt(net)} Kč` + (bits.length ? ` (${bits.join(', ')})` : ''));
+  if (sc) bits.push(`${TM(pInd(o.pid)).defectsLow} −${fmt(sc)}`);
+  toast(`✅ ${PROD[o.pid].name} (${TM(pInd(o.pid)).unit(o.qty)}) hotovo: +${fmt(net)} Kč` + (bits.length ? ` (${bits.join(', ')})` : ''));
 }
 function failOrder(o) {
   G.active = G.active.filter(x => x !== o && x.parent !== o.id);
@@ -1197,8 +1210,8 @@ function spawnRework(o, d, k) {
   if (quiet) return;
   const who = G.workers.length ? G.workers[Math.floor(Math.random() * G.workers.length)].name : 'Někdo';
   const st = o.steps[k], pool = jokePool(st);
-  const line = pool[Math.floor(Math.random() * pool.length)].replace(/\{who\}/g, who).replace(/\{n\}/g, d);
-  toast(`💥 ${STEPS[st].icon} ${line} (−${fmt(cost)} Kč) · vznikla podzakázka na přepracování`, true);
+  const line = pool[Math.floor(Math.random() * pool.length)].replace(/\{who\}/g, who).replace(/\{n\}/g, TM(o.ind || pInd(o.pid)).unit(d));
+  toast(`💥 ${STEPS[st].icon} ${line} (−${fmt(cost)} Kč) · ${TM(pInd(o.pid)).subToast}`, true);
 }
 /* Dokončené podzakázky předají náklady hlavní zakázce; hotové hlavní zakázky se vyplatí. */
 function settle() {
@@ -1249,7 +1262,7 @@ function dispatchPick() {
 function autoAccept() {
   if (!G.staff.dispatcher || mainCount() >= slots()) return;
   const pick = dispatchPick();
-  if (pick && acceptOrder(pick.o, pick.plan)) toast(`🧑‍💼 Dispečer přijal: ${PROD[pick.o.pid].name} ×${pick.o.qty}`);
+  if (pick && acceptOrder(pick.o, pick.plan)) toast(`🧑‍💼 Dispečer přijal: ${PROD[pick.o.pid].name} (${TM(pInd(pick.o.pid)).unit(pick.o.qty)})`);
 }
 
 /* Skladník: hromadný nákup materiálu se slevou do zásoby. */
@@ -1364,15 +1377,18 @@ const TABS = [
   ['upgrades', '⬆️', 'Vylepšení'],
   ['more',     '⚙️', 'Více']
 ];
+const prodLabel = () => { const a = new Set(G.sites.map(x => x.ind)); return a.size > 1 ? 'Provoz' : TM([...a][0]).tab; };
 function buildTabs() {
   $('#tabs').innerHTML = TABS.map(t =>
-    `<button data-tab="${t[0]}"><span>${t[1]}</span>${t[2]}</button>`).join('');
+    `<button data-tab="${t[0]}"><span>${t[1]}</span>${t[0] === 'prod' && G ? prodLabel() : t[2]}</button>`).join('');
   markTab();
 }
 function markTab() {
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === curTab));
 }
 function renderHeader() {
+  const pb = document.querySelector('#tabs [data-tab="prod"]');
+  if (pb && G && pb.lastChild && pb.lastChild.textContent !== prodLabel()) pb.lastChild.textContent = prodLabel();
   $('#hMoney').textContent = fmt(G.money);
   $('#hRep').textContent = fmt(G.rep);
   $('#hName').textContent = `${G.name} · ${START.name}`;
@@ -1428,7 +1444,7 @@ function buildOrders() {
   for (const o of G.orders) {
     const p = PROD[o.pid];
     h += `<div class="card" data-oid="${o.id}">
-      <div class="row"><b>${p.icon} ${p.name}</b><span class="tag">×${o.qty}</span></div>
+      <div class="row"><b>${p.icon} ${p.name}</b><span class="tag">${TM(p.ind).unit(o.qty)}</span></div>
       <button class="btn full" style="margin:6px 0" data-act="accept" data-id="${o.id}">Přijmout</button>
       <div class="chips">${p.steps.map(s => `<span class="chip">${STEPS[s].icon} ${STEPS[s].name}${stationCount(s) === 0 ? ' 🤝' : ''}</span>`).join('')}</div>
       <div class="row small">
@@ -1460,7 +1476,7 @@ function updateOrders() {
     const full = mainCount() >= slots();
     const poor = !canPayMaterial(orderCost(o));
     b.disabled = full || poor;
-    const txt = full ? 'Dílna je plná' : poor ? 'Chybí peníze na materiál'
+    const txt = full ? TM(p0ind(o)).full : poor ? `Chybí peníze na ${TM(p0ind(o)).mat}`
       : needSteps(o).length ? 'Přijmout a zvolit kooperaci' : 'Přijmout';
     if (b.textContent !== txt) b.textContent = txt;
   });
@@ -1473,7 +1489,7 @@ function buildProd() {
   for (const o of G.active) {
     const p = PROD[o.pid];
     h += `<div class="card${o.sub ? ' sub' : ''}" data-aid="${o.id}">
-      <div class="row"><b>${o.sub ? '🔁 Přepracování: ' : ''}${p.icon} ${p.name}</b><span class="tag">×${o.qty}</span></div>
+      <div class="row"><b>${o.sub ? '🔁 ' + TM(p.ind).redo + ': ' : ''}${p.icon} ${p.name}</b><span class="tag">${TM(p.ind).unit(o.qty)}</span></div>
       <div class="chips">${o.steps.map((s, i) => `<span class="chip" data-i="${i}">${STEPS[s].icon} ${STEPS[s].name}</span>`).join('')}</div>
       <div class="bar"><i data-bar></i></div>
       <div class="row small">
@@ -1504,8 +1520,8 @@ function updateProd() {
     bar.style.width = pct + '%';
     const redo = o.redoTo >= 0 || o.sub ? '🔁 ' : '';
     let label;
-    if (waiting) label = `📦 Čeká na dodání materiálu: ${fmtTime(o.wait)}`;
-    else if (!st && o.lineDone && o.subs) label = `⏳ Čeká na přepracování (${G.active.filter(x => x.parent === o.id).reduce((n, x) => n + x.qty, 0)} ks)`;
+    if (waiting) label = `📦 Čeká na dodání ${TM(o.ind || pInd(o.pid)).matIn}: ${fmtTime(o.wait)}`;
+    else if (!st && o.lineDone && o.subs) label = `⏳ Čeká na ${pInd(o.pid) === 'car' ? 'reklamaci' : 'přepracování'} (${TM(pInd(o.pid)).unit(G.active.filter(x => x.parent === o.id).reduce((n, x) => n + x.qty, 0))})`;
     else if (!st) label = 'Hotovo';
     else if (o.coop) label = `${redo}🤝 ${STEPS[st].name} u dodavatele: ${fmtTime(o.coop.left)}`;
     else if (isPending(o)) label = `${redo}${STEPS[st].name}: čeká na kooperaci`;
@@ -1521,16 +1537,16 @@ function updateProd() {
     const par = o.sub ? G.active.find(x => x.id === o.parent) : null;
     card.querySelector('[data-left]').textContent = fmtTime(par ? par.left : o.left);
     const sEl = card.querySelector('[data-scrap]');
-    const sTxt = o.sub ? 'Zmetky z hlavní zakázky se dělají znovu od začátku, hlavní zakázka na ně počká.'
-      : o.scrap ? `⚠ Zmetků ${o.scrap} ks (−${fmt(o.scrapCost)} Kč za materiál)` + (o.redoTo >= 0 ? ` · přepracování ${o.pieces} ks` : '') : '';
+    const T = TM(pInd(o.pid)), sTxt = o.sub ? T.subNote
+      : o.scrap ? `⚠ ${T.defectsOf} ${T.unit(o.scrap)} (−${fmt(o.scrapCost)} Kč za ${T.matFor})` + (o.redoTo >= 0 ? ` · ${T.redoWord} ${T.unit(o.pieces)}` : '') : '';
     if (sEl.textContent !== sTxt) sEl.textContent = sTxt;
     const mb = card.querySelector('[data-main]');
     let act, txt, dis = false;
-    if (waiting) { act = 'none'; txt = '📦 Čeká se na materiál…'; dis = true; }
+    if (waiting) { act = 'none'; txt = `📦 Čeká se na ${TM(pInd(o.pid)).mat}…`; dis = true; }
     else if (o.coop) { act = 'none'; txt = '🤝 Kooperace běží…'; dis = true; }
     else if (isPending(o)) { act = 'none'; txt = '🤝 Předávám dodavateli…'; dis = true; }
     else if (canManual(o)) { act = 'work'; txt = `⚒ Pracovat sám (+${clickPower()})`; }
-    else if (o.lineDone && o.subs) { act = 'none'; txt = '⏳ Čeká na přepracování'; dis = true; }
+    else if (o.lineDone && o.subs) { act = 'none'; txt = pInd(o.pid) === 'car' ? '⏳ Čeká na reklamaci' : '⏳ Čeká na přepracování'; dis = true; }
     else { act = 'none'; txt = 'Hotovo'; dis = true; }
     if (mb.dataset.act !== act) mb.dataset.act = act;
     if (mb.textContent !== txt) mb.textContent = txt;
@@ -1777,7 +1793,7 @@ function updateCompany() {
       `Sídlo (${esc(G.sites[G.cs].name)}): <b>${HALLS[G.hall].name}</b> · hala <b>${spaceUsed()} / ${hallCap()} m²</b><br>` +
       `Zaměstnanci: <b>${G.workers.length}</b> · stroje: <b>${units}</b> · stanice: <b>${stations}</b><br>` +
       `Technologie střediska: <b>${techCount()} / ${stepsOf(siteInd()).length}</b> · čas hry: <b>${fmtDur(G.playTime)}</b><br>` +
-      `Personál mimo výrobu: <b>${STAFF_ORDER.filter(r => G.staff[r]).length} / ${STAFF_ORDER.length}</b> · zmetků celkem: <b>${G.scrapped} ks</b>`;
+      `Personál mimo výrobu: <b>${STAFF_ORDER.filter(r => G.staff[r]).length} / ${STAFF_ORDER.length}</b> · zmetků a reklamací celkem: <b>${G.scrapped}</b>`;
   }
   const hn = view.querySelector('[data-hname]');
   if (hn) {
@@ -2095,8 +2111,8 @@ function openDispatcher() {
     <label class="small">Kooperace<select data-disp="coop">${opts(COOP_POLICY, d.coop)}</select></label>
     <div class="small" style="margin-top:12px">Typy zakázek</div>
     <label class="chk"><input type="checkbox" data-disp="svc"${d.svc ? ' checked' : ''}> Zakázkové práce (1 operace)</label>
-    <label class="chk"><input type="checkbox" data-disp="mid"${d.mid ? ' checked' : ''}> Jednodušší výrobky (2–3 operace)</label>
-    <label class="chk"><input type="checkbox" data-disp="big"${d.big ? ' checked' : ''}> Složité výrobky (4 a víc operací)</label>
+    <label class="chk"><input type="checkbox" data-disp="mid"${d.mid ? ' checked' : ''}> Jednodušší zakázky (2–3 operace)</label>
+    <label class="chk"><input type="checkbox" data-disp="big"${d.big ? ' checked' : ''}> Složité zakázky (4 a víc operací)</label>
     <label class="chk"><input type="checkbox" data-disp="safe"${d.safe ? ' checked' : ''}> Jen zakázky, které stihnu v termínu</label>
     <button class="btn full" data-act="coopclose">Hotovo</button>
   </div>`;
