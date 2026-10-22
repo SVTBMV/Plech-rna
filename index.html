@@ -205,7 +205,7 @@ const MACHINES = [
 ];
 MACHINES.push(                                    // autoservis: 3 třídy strojů v každé operaci
   { id: 'obd',          step: 'diag',   name: 'OBD čtečka a notebook',          price: 100,   rate: 0.6 },
-  { id: 'tester',      step: 'diag',   name: 'Diagnostický tester',            price: 1800,  rate: 3.2 },
+  { id: 'tester',      step: 'diag',   name: 'TPMS & OBD diagnostika',            price: 1800,  rate: 3.2 },
   { id: 'diag_line',   step: 'diag',   name: 'Diagnostická linka s měřením',   price: 14000, rate: 16 },
   { id: 'tire_hand',   step: 'wheels', name: 'Ruční montáž pneu',              price: 90,    rate: 0.5 },
   { id: 'tire_machine',step: 'wheels', name: 'Pneumontážní stroj',             price: 1500,  rate: 3 },
@@ -349,7 +349,7 @@ const UPGRADES = [
   { id: 'click',    name: 'Lepší nářadí',          desc: '+1 k ruční práci za klepnutí',                         max: 20, cost: l => Math.round(60 * Math.pow(1.9, l)) },
   { id: 'slots',    name: 'Větší dílna',           desc: '+1 zakázka zpracovávaná současně',                     max: 6,  cost: l => Math.round(400 * Math.pow(3, l)) },
   { id: 'sales',    name: 'Obchodní zástupce',     desc: 'Víc poptávek a rychlejší příliv nových',               max: 5,  cost: l => Math.round(300 * Math.pow(2.8, l)) },
-  { id: 'supplier', name: 'Dodavatel materiálu',      desc: 'Materiál o 5 % levnější',                              max: 8,  cost: l => Math.round(500 * Math.pow(2.4, l)) },
+  { id: 'supplier', name: 'Dodavatel materiálu',      desc: 'Materiál o 5 % levnější a dodání o 10 % rychlejší',                              max: 8,  cost: l => Math.round(500 * Math.pow(2.4, l)) },
   { id: 'eff',      name: 'Štíhlá výroba',         desc: 'Všechny stroje o 10 % rychlejší',                      max: 15, cost: l => Math.round(1200 * Math.pow(2.2, l)) }
 ];
 
@@ -359,9 +359,9 @@ const UPGRADES = [
    a strhává se z odměny zakázky (nepotřebujete kapitál).
    speed = násobek rychlosti stroje, wage = Kč za sekundu práce, hire = cena za najmutí. */
 const WORKER = {
-  fast: { icon: '🧑‍🔧', name: 'Zkušený mistr',      desc: 'Rychlý, ale drahý',     speed: 1.6, wage: 0.6,  hire: 700 },
-  norm: { icon: '👷',   name: 'Vyučený pracovník', desc: 'Normální rychlost i mzda', speed: 1,   wage: 0.25, hire: 250 },
-  slow: { icon: '🧑‍🎓', name: 'Brigádník',          desc: 'Pomalý, ale levný',     speed: 0.6, wage: 0.1,  hire: 100 }
+  fast: { icon: '🧑‍🔧', name: 'Zkušený mistr',      desc: 'Rychlý, ale drahý',     speed: 1.6, wage: 1.2,  hire: 1500 },
+  norm: { icon: '👷',   name: 'Vyučený pracovník', desc: 'Normální rychlost i mzda', speed: 1,   wage: 0.5,  hire: 500 },
+  slow: { icon: '🧑‍🎓', name: 'Brigádník',          desc: 'Pomalý, ale levný',     speed: 0.6, wage: 0.2,  hire: 200 }
 };
 const WORKER_ORDER = ['fast', 'norm', 'slow'];
 const NAMES = ['Honza', 'Petr', 'Tomáš', 'Jakub', 'Martin', 'Lukáš', 'Pavel', 'Michal', 'David', 'Ondra',
@@ -426,7 +426,7 @@ const COOP_POLICY = { never: 'Nikdy (jen vlastní výroba)', slow: 'Jen pomalu a
 const defaultDisp = () => ({ prio: 'profit', margin: 0, coop: 'norm', svc: true, mid: true, big: true, safe: true });
 
 /* ===================== SKLAD ===================== */
-/* Sklad zabírá místo v hale a drží zásobu materiálu (v Kč tržní ceny). Skladník ho přijímá za
+/* Sklad zabírá místo v hale a drží zásobu materiálu (v Kč tržní ceny). Co není na skladě, se objednává a zakázka čeká na dodání. Skladník ho přijímá za
    hromadný nákup se slevou a vydává pro zakázky. Zakázka platí materiál nejdřív ze zásoby. */
 const WAREHOUSES = [
   { name: 'Žádný sklad',      cap: 0,      area: 0,   w: 0,  h: 0,  rep: 0,   cost: 0 },
@@ -554,7 +554,7 @@ function planTotal(o, plan) {
   }
   return { cost, time };
 }
-const isPending = o => !o.coop && !o.done && !!o.steps[o.step] && stationCount(o.steps[o.step]) === 0 &&
+const isPending = o => !(o.wait > 0) && !o.coop && !o.done && !!o.steps[o.step] && stationCount(o.steps[o.step]) === 0 &&
   !(o.plan && o.plan[o.steps[o.step]] === 'self' && machineUnits(o.steps[o.step]) > 0);
 function startCoop(o, optId) {
   const q = coopQuote(o, optId);
@@ -1020,9 +1020,15 @@ const spaceUsed = si => { si = si == null ? G.cs : si; const x = G.sites[si];
   return MACHINES.reduce((n, m) => n + (x.machines[m.id] || 0) * FOOTPRINT[m.tier], 0) + (si === 0 ? WAREHOUSES[G.wh].area + OFFICES[G.office].area : 0); };
 const hallCap = si => HALLS[G.sites[si == null ? G.cs : si].hall].area;
 const spaceFree = si => hallCap(si) - spaceUsed(si);
-const sellValue = m => Math.floor(0.5 * Math.ceil(m.price * Math.pow(1.15, Math.max(0, (totalOwned(m.id) || 1) - 1))));
+/* velikost zakázky roste s reputací: 0 rep ≈ 35 %, 100 rep ≈ 1,2×, 400 rep ≈ 2,3×, strop 3× */
+const sizeMult = () => Math.min(3, 0.35 + Math.sqrt(Math.max(0, G.rep)) / 9);
+const ECON = { priceMul: [25, 28, 110], growth: 1.15, repMul: 0.5 };   // ladění ekonomiky: násobek ceny strojů podle třídy (4/8/16 m²), růst ceny za kus, tempo reputace
+const sellValue = m => Math.floor(0.5 * Math.ceil(m.price * ECON.priceMul[m.tier] * Math.pow(ECON.growth, Math.max(0, (totalOwned(m.id) || 1) - 1))));
 const hireCost = tier => Math.ceil(WORKER[tier].hire * Math.pow(1.3, G.workers.length));
-const machineCost = m => Math.ceil(m.price * Math.pow(1.15, totalOwned(m.id)));
+const machineCost = m => Math.ceil(m.price * ECON.priceMul[m.tier] * Math.pow(ECON.growth, totalOwned(m.id)));
+/* Dodání materiálu: co není na skladě, se objednává u dodavatele a zakázka čeká (termín mezitím běží). */
+const matDelay = bought => bought <= 0 ? 0 : Math.round((40 + 3 * Math.sqrt(bought)) * Math.pow(0.9, G.upg.supplier || 0));
+const orderDelay = c => matDelay(c - Math.min(G.stock, c));
 const orderCost = o => Math.ceil(o.matBase * matMult());
 const rand = (a, b) => a + Math.random() * (b - a);
 
@@ -1066,7 +1072,7 @@ function genOrder() {
   let r = Math.random() * weights.reduce((a, b) => a + b, 0), idx = 0;
   for (; idx < weights.length - 1; idx++) { r -= weights[idx]; if (r <= 0) break; }
   const p = avail[idx];
-  const qty = Math.round(rand(p.q[0], p.q[1]));
+  const qty = Math.max(2, Math.round(rand(p.q[0], p.q[1]) * sizeMult()));
   const work = qty * p.work;
   const totalWork = work * p.steps.length;
   return {
@@ -1088,8 +1094,8 @@ function payMaterial(c) { const u = Math.min(G.stock, c); G.stock -= u; G.money 
 function evalOrder(o, plan) {
   const p = PROD[o.pid];
   plan = plan || planDefault(o);
-  const mat = orderCost(o);
-  let coop = 0, wage = 0, time = 0, ok = 1;
+  const mat = orderCost(o), wait = orderDelay(mat);
+  let coop = 0, wage = 0, time = wait, ok = 1;
   for (const st of p.steps) {
     const sts = stationList(st);
     if (sts.length) {                                   // vlastní stanice (nejrychlejší)
@@ -1104,7 +1110,7 @@ function evalOrder(o, plan) {
   }
   const over = staffWagePerSec() * time / (mainCount() + 1);
   const cost = mat + coop + wage + over;
-  return { mat, coop, wage, over, time, cost, profit: o.reward - cost, risk: 1 - ok };
+  return { mat, wait, coop, wage, over, time, cost, profit: o.reward - cost, risk: 1 - ok };
 }
 function estHtml(o, plan) {
   const ev = evalOrder(o, plan);
@@ -1115,7 +1121,7 @@ function estHtml(o, plan) {
   if (ev.over >= 1) parts.push(`režie ${fmt(ev.over)}`);
   return `<div>Náklady <b>${fmt(ev.cost)} Kč</b> <span class="small">(${parts.join(' · ')})</span></div>
     <div>Zisk při bezchybné výrobě: <b class="${ev.profit >= 0 ? 'pos' : 'neg'}">${ev.profit >= 0 ? '+' : '−'}${fmt(Math.abs(ev.profit))} Kč</b> (${pc} %)</div>
-    <div class="small">Výroba asi ${fmtTime(ev.time)}${ev.time > o.deadline ? ' <span class="neg">⚠ nestihnete termín</span>' : ''} · riziko zmetku asi ${(ev.risk * 100).toFixed(1)} % kusů</div>`;
+    <div class="small">${ev.wait ? `📦 Dodání materiálu ${fmtTime(ev.wait)}` : '📦 Materiál ze skladu ihned'} · celkem asi ${fmtTime(ev.time)}${ev.time > o.deadline ? ' <span class="neg">⚠ nestihnete termín</span>' : ''} · riziko zmetku asi ${(ev.risk * 100).toFixed(1)} % kusů</div>`;
 }
 
 const mainCount = () => G.active.filter(x => !x.sub).length;     // podzakázky (přepracování) nezabírají místo v dílně
@@ -1123,12 +1129,13 @@ function acceptOrder(o, plan) {
   if (mainCount() >= slots()) return false;
   const c = orderCost(o);
   if (!canPayMaterial(c)) return false;           // předem se platí jen materiál (ze zásoby, pak z peněz)
+  const wait = orderDelay(c);
   payMaterial(c);
   G.orders = G.orders.filter(x => x !== o);
   const p = PROD[o.pid];
   G.active.push({ id: o.id, pid: o.pid, qty: o.qty, work: o.work, cw: o.work, pieces: o.qty, redoTo: -1,
                   reward: o.reward, matBase: o.matBase,
-                  left: o.deadline, steps: p.steps, step: 0, prog: 0, done: false,
+                  left: o.deadline, wait, waitTotal: wait, steps: p.steps, step: 0, prog: 0, done: false,
                   coop: null, coopCost: 0, wageCost: 0, scrap: 0, scrapCost: 0, plan: plan || planDefault(o) });
   return true;
 }
@@ -1139,7 +1146,7 @@ function finishOrder(o) {
   G.money += net;
   G.totalEarned += net;
   G.done++;
-  G.rep += PROD[o.pid].g * (perk().rep || 1);
+  G.rep += PROD[o.pid].g * (perk().rep || 1) * ECON.repMul;
   const bits = [];
   if (cc) bits.push(`kooperace −${fmt(cc)}`);
   if (wc >= 1) bits.push(`mzdy −${fmt(wc)}`);
@@ -1267,6 +1274,8 @@ function autoRestock() {
 function tick(dt, offline) {
   G.playTime += dt;
 
+  for (const o of G.active) if (o.wait > 0) o.wait = Math.max(0, o.wait - dt);   // čekání na dodání materiálu
+
   // kooperace: dodavatel pracuje na kroku za nás (běží i offline)
   for (const o of G.active) {
     if (!o.coop) continue;
@@ -1279,7 +1288,7 @@ function tick(dt, offline) {
   for (const st of STEP_ORDER) {
     const sts = stationList(st);
     if (!sts.length) continue;
-    const queue = G.active.filter(o => !o.coop && !o.done && o.steps[o.step] === st).sort((a, b) => (b.sub ? 1 : 0) - (a.sub ? 1 : 0));   // přepracování má přednost
+    const queue = G.active.filter(o => !(o.wait > 0) && !o.coop && !o.done && o.steps[o.step] === st).sort((a, b) => (b.sub ? 1 : 0) - (a.sub ? 1 : 0));   // přepracování má přednost
     const k = Math.min(sts.length, queue.length);
     for (let i = 0; i < k; i++) {
       const o = queue[i], s = sts[i];
@@ -1347,11 +1356,11 @@ function frame() {
 
 /* ===================== UI: HLAVIČKA, ZÁLOŽKY ===================== */
 const TABS = [
-  ['company',  '🏢', 'Firma'],
   ['orders',   '📋', 'Zakázky'],
   ['prod',     '⚒️', 'Výroba'],
   ['machines', '🏭', 'Stroje'],
   ['workers',  '👷', 'Lidé'],
+  ['company',  '🏢', 'Firma'],
   ['upgrades', '⬆️', 'Vylepšení'],
   ['more',     '⚙️', 'Více']
 ];
@@ -1402,7 +1411,7 @@ function update() {
     default: return updateMore();
   }
 }
-const canManual = o => !o.coop && !o.done && !!o.steps[o.step] && machineUnits(o.steps[o.step]) > 0 && !isPending(o);
+const canManual = o => !(o.wait > 0) && !o.coop && !o.done && !!o.steps[o.step] && machineUnits(o.steps[o.step]) > 0 && !isPending(o);
 const chips = steps => steps.map(s => `<span class="chip">${STEPS[s].icon} ${STEPS[s].name}</span>`).join('');
 
 /* --- Zakázky --- */
@@ -1489,18 +1498,20 @@ function updateProd() {
     if (!o) return;
     const bar = card.querySelector('[data-bar]');
     const st = o.steps[o.step];
-    const pct = o.coop ? Math.min(100, (1 - o.coop.left / o.coop.total) * 100)
+    const waiting = o.wait > 0;
+    const pct = waiting ? Math.min(100, (1 - o.wait / (o.waitTotal || o.wait)) * 100) : o.coop ? Math.min(100, (1 - o.coop.left / o.coop.total) * 100)
                        : Math.min(100, o.prog / o.cw * 100);
     bar.style.width = pct + '%';
     const redo = o.redoTo >= 0 || o.sub ? '🔁 ' : '';
     let label;
-    if (!st && o.lineDone && o.subs) label = `⏳ Čeká na přepracování (${G.active.filter(x => x.parent === o.id).reduce((n, x) => n + x.qty, 0)} ks)`;
+    if (waiting) label = `📦 Čeká na dodání materiálu: ${fmtTime(o.wait)}`;
+    else if (!st && o.lineDone && o.subs) label = `⏳ Čeká na přepracování (${G.active.filter(x => x.parent === o.id).reduce((n, x) => n + x.qty, 0)} ks)`;
     else if (!st) label = 'Hotovo';
     else if (o.coop) label = `${redo}🤝 ${STEPS[st].name} u dodavatele: ${fmtTime(o.coop.left)}`;
     else if (isPending(o)) label = `${redo}${STEPS[st].name}: čeká na kooperaci`;
     else {
       const sc = stationCount(st);
-      const idx = G.active.filter(x => !x.coop && !x.done && x.steps[x.step] === st).sort((a, b) => (b.sub ? 1 : 0) - (a.sub ? 1 : 0)).indexOf(o);
+      const idx = G.active.filter(x => !(x.wait > 0) && !x.coop && !x.done && x.steps[x.step] === st).sort((a, b) => (b.sub ? 1 : 0) - (a.sub ? 1 : 0)).indexOf(o);
       label = sc === 0 ? `${redo}${STEPS[st].name}: ruční práce – ${Math.floor(pct)} %`
         : idx < sc ? `${redo}${STEPS[st].name}: ${Math.floor(pct)} %`
         : `${redo}${STEPS[st].name}: čeká na volnou stanici (${Math.floor(pct)} %)`;
@@ -1515,7 +1526,8 @@ function updateProd() {
     if (sEl.textContent !== sTxt) sEl.textContent = sTxt;
     const mb = card.querySelector('[data-main]');
     let act, txt, dis = false;
-    if (o.coop) { act = 'none'; txt = '🤝 Kooperace běží…'; dis = true; }
+    if (waiting) { act = 'none'; txt = '📦 Čeká se na materiál…'; dis = true; }
+    else if (o.coop) { act = 'none'; txt = '🤝 Kooperace běží…'; dis = true; }
     else if (isPending(o)) { act = 'none'; txt = '🤝 Předávám dodavateli…'; dis = true; }
     else if (canManual(o)) { act = 'work'; txt = `⚒ Pracovat sám (+${clickPower()})`; }
     else if (o.lineDone && o.subs) { act = 'none'; txt = '⏳ Čeká na přepracování'; dis = true; }
