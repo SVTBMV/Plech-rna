@@ -39,6 +39,10 @@ nav button.on{color:var(--acc);border-left-color:var(--acc);background:var(--pan
 @media(min-width:760px){main{padding:16px 20px 40px}}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px}
 .card.ok{border-color:var(--ok);background:#14251f}
+.card.wk{position:relative;overflow:hidden;min-height:112px}
+.card.wk>*{position:relative;z-index:1}
+.card.wk>img.wkbg{position:absolute;z-index:0;right:0;top:0;height:100%;width:70%;object-fit:cover;object-position:center;opacity:.38;
+  -webkit-mask-image:linear-gradient(to right,transparent,#000 55%);mask-image:linear-gradient(to right,transparent,#000 55%);pointer-events:none}
 .card.sub{border-style:dashed;border-color:var(--bad);margin-left:14px}
 .card h3{margin:0 0 6px}
 .row{display:flex;justify-content:space-between;align-items:center;gap:8px}
@@ -65,7 +69,7 @@ h2.sec{font-size:.95rem;margin:16px 2px 8px;color:var(--acc2)}
 .slim{display:flex;justify-content:space-between;align-items:center;gap:10px}
 .slim .btn{min-width:110px}
 textarea{width:100%;min-height:80px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px;font-size:.75rem}
-input[type=text]{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px;margin-top:4px}
+input[type=text],input[type=email],input[type=password]{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px;margin-top:4px}
 #start{position:fixed;inset:0;z-index:20;background:var(--bg);overflow:auto;padding:20px 14px 40px}
 #start[hidden]{display:none}
 .start-box{max-width:560px;margin:0 auto}
@@ -141,7 +145,8 @@ select{width:100%;background:var(--panel2);border:1px solid var(--line);border-r
 <script>
 'use strict';
 /* ===================== DATA ===================== */
-const SAVE_KEY = 'plecharna_save_v1';
+const SAVE_KEY = 'plecharna_save_v1';          // starý (společný) klíč, jen pro převod
+const saveKey = () => SAVE_KEY + '_' + (Cloud.session ? Cloud.session.user.id : 'anon');
 const OFFLINE_CAP = 8 * 3600;           // max. offline postup (s)
 
 const STEPS = {
@@ -583,9 +588,48 @@ function openPlan(oid) {
   planOid = o.id; planSel = planDefault(o); buildModal();
 }
 let confirmCb = null;
-function closeCoop() { planOid = null; confirmCb = null; $('#modal').hidden = true; }
+let resetTimer = null;
+function closeCoop() { clearInterval(resetTimer); resetTimer = null; planOid = null; confirmCb = null; $('#modal').hidden = true; const c = confirmCancel; confirmCancel = null; if (c) c(); }
+let confirmCancel = null;
+/* Nová hra: dvě potvrzení, druhé s 60s odpočtem. */
+function resetStep1() {
+  $('#modal').hidden = false;
+  $('#modal').innerHTML = `<div class="mbox"><h3>⚠️ Začít novou hru?</h3>
+    <div class="small">Tím se <b>smaže veškerý váš postup</b> – peníze, stroje, haly, střediska, zaměstnanci, reputace i uložení v cloudu.
+    <b>Tuto akci nelze vrátit zpět.</b></div>
+    <div class="small" style="margin-top:8px">Opravdu chcete hru smazat?</div>
+    <button class="btn full danger" data-act="resetnext">Ano, chci smazat hru</button>
+    <button class="btn full ghost" data-act="coopclose">Ne, vrátit se do hry</button></div>`;
+}
+function resetStep2() {
+  let left = 60;
+  $('#modal').innerHTML = `<div class="mbox"><h3>🛑 Poslední upozornění</h3>
+    <div class="small">Jste si <b>opravdu jistí</b>, že chcete smazat celou hru? Zmizí <b>úplně všechno</b> a už se to <b>nikdy nedá obnovit</b>.
+    Tlačítko se odemkne po odpočtu, rozmyslete si to.</div>
+    <div class="small" style="margin-top:10px;font-size:1.4rem;text-align:center" data-rcount>${left} s</div>
+    <button class="btn full danger" data-act="resetgo" disabled>Smazat vše a začít novou hru (${left})</button>
+    <button class="btn full ghost" data-act="coopclose">Zrušit – nechci mazat</button></div>`;
+  clearInterval(resetTimer);
+  resetTimer = setInterval(() => {
+    left--;
+    const btn = document.querySelector('[data-act="resetgo"]'), c = document.querySelector('[data-rcount]');
+    if (!btn) { clearInterval(resetTimer); return; }
+    if (left > 0) { btn.textContent = `Smazat vše a začít novou hru (${left})`; if (c) c.textContent = left + ' s'; }
+    else { clearInterval(resetTimer); resetTimer = null; btn.disabled = false; btn.textContent = 'Smazat vše a začít novou hru'; if (c) c.textContent = 'Nyní můžete potvrdit'; }
+  }, 1000);
+}
+async function resetGame() {
+  const key = saveKey();
+  G = null; START = null;                       // aby ho pagehide/interval znovu neuložil
+  try { localStorage.removeItem(key); } catch (e) {}
+  closeCoop();
+  try { if (Cloud.on) await Cloud.deleteSave(); } catch (e) { toast('Cloudové uložení se nepodařilo smazat: ' + cloudErr(e), true); }
+  curTab = 'orders'; viewSig = ''; markTab();
+  view.innerHTML = '';
+  showStart();
+}
 function askConfirm(text, yesLabel, cb) {
-  confirmCb = cb;
+  confirmCb = cb; confirmCancel = null;
   $('#modal').hidden = false;
   $('#modal').innerHTML = `<div class="mbox"><h3>Potvrdit</h3><div class="small">${esc(text)}</div>
     <button class="btn full danger" data-act="confyes">${esc(yesLabel)}</button>
@@ -617,18 +661,194 @@ function buildModal() {
   </div>`;
 }
 
-/* ===================== CLOUD (zatím jen zástupka) ===================== */
-/* Sem se později zapojí Supabase – viz supabase-schema.sql a README.md.
-   Hra běží dál lokálně, tyto metody se budou volat navíc. */
+/* ===================== CLOUD (Supabase: účet + cloudové uložení) ===================== */
+/* Bez knihovny, jen fetch na REST rozhraní Supabase. Klíč "publishable" smí být veřejně v kódu –
+   data chrání pravidla (RLS) v databázi, viz supabase-schema.sql. */
+const SB_URL = 'https://dgogauvrflnxqzimwmqj.supabase.co';
+const SB_KEY = 'sb_publishable_UB_7Fdbj3Nl17aBrJUf4bw_FnS_RGq4';
+const AUTH_KEY = 'plecharna_auth_v1';
+const ADMIN_EMAILS = ['martinvrzan12@gmail.com'];          // jen tito uživatelé vidí Admin panel (testovací pomůcky)
 const Cloud = {
-  enabled: false,
-  async signIn(email, password) { throw new Error('Cloud zatím není připojen'); },
-  async saveGame(state) { /* upsert do tabulky saves */ },
-  async loadGame() { return null; },
-  async listOffers(itemId) { return []; },
+  session: null,                 // { access_token, refresh_token, expires_at, user: { id, email }, nick }
+  status: 'Nepřihlášeno',
+  lastSeen: null,                // updated_at cloudové kopie, kterou jsme naposledy četli/zapsali
+  busy: false, conflict: false, lastPush: 0,
+  get on() { return !!this.session; },
+  restore() {
+    try { const s = JSON.parse(localStorage.getItem(AUTH_KEY) || 'null'); if (s && s.access_token && s.user) this.session = s; } catch (e) {}
+    if (this.session) this.status = 'Přihlášeno';
+  },
+  store() { try { if (this.session) localStorage.setItem(AUTH_KEY, JSON.stringify(this.session)); else localStorage.removeItem(AUTH_KEY); } catch (e) {} },
+  async raw(path, opt = {}, token) {
+    const h = Object.assign({ apikey: SB_KEY, 'Content-Type': 'application/json' }, opt.headers || {});
+    h.Authorization = 'Bearer ' + (token || SB_KEY);
+    const r = await fetch(SB_URL + path, Object.assign({}, opt, { headers: h }));
+    let body = null; const txt = await r.text();
+    try { body = txt ? JSON.parse(txt) : null; } catch (e) { body = txt; }
+    if (!r.ok) { const e = new Error((body && (body.msg || body.message || body.error_description || body.error)) || ('HTTP ' + r.status)); e.status = r.status; e.body = body; throw e; }
+    return body;
+  },
+  setSession(b, nick) {
+    this.session = { access_token: b.access_token, refresh_token: b.refresh_token,
+      expires_at: b.expires_at || Math.floor(Date.now() / 1000) + (b.expires_in || 3600),
+      user: { id: b.user.id, email: b.user.email },
+      nick: nick || (b.user.user_metadata && b.user.user_metadata.nick) || (this.session && this.session.nick) || 'Hráč' };
+    this.store();
+  },
+  async token() {
+    if (!this.session) throw new Error('Nepřihlášeno');
+    if (Date.now() / 1000 > this.session.expires_at - 60) {
+      try {
+        const b = await this.raw('/auth/v1/token?grant_type=refresh_token', { method: 'POST', body: JSON.stringify({ refresh_token: this.session.refresh_token }) });
+        this.setSession(b);
+      } catch (e) { if (e.status === 400 || e.status === 401) { this.session = null; this.store(); } throw e; }
+    }
+    return this.session.access_token;
+  },
+  async signUp(email, password, nick) {
+    const b = await this.raw('/auth/v1/signup', { method: 'POST', body: JSON.stringify({ email, password, data: { nick } }) });
+    if (b && b.access_token) { this.setSession(b, nick); return 'ok'; }
+    return 'confirm';            // zapnuté potvrzení e-mailem
+  },
+  async signIn(email, password) {
+    const b = await this.raw('/auth/v1/token?grant_type=password', { method: 'POST', body: JSON.stringify({ email, password }) });
+    this.setSession(b);
+  },
+  async signOut() {
+    try { if (this.session) await this.raw('/auth/v1/logout', { method: 'POST' }, this.session.access_token); } catch (e) {}
+    this.session = null; this.lastSeen = null; this.conflict = false; this.store(); this.status = 'Nepřihlášeno';
+  },
+  async rest(path, opt) { return this.raw('/rest/v1/' + path, opt, await this.token()); },
+  async pull() {                 // cloudové uložení, nebo null
+    const r = await this.rest(`saves?user_id=eq.${this.session.user.id}&select=data,play_time,updated_at`);
+    return r && r[0] ? r[0] : null;
+  },
+  async head() {
+    const r = await this.rest(`saves?user_id=eq.${this.session.user.id}&select=updated_at`);
+    return r && r[0] ? r[0].updated_at : null;
+  },
+  async push(state, keepalive) {
+    const uid = this.session.user.id;
+    const row = { user_id: uid, data: JSON.parse(JSON.stringify(state)), play_time: state.playTime || 0 };
+    const r = await this.rest('saves?on_conflict=user_id', { method: 'POST', keepalive: !!keepalive,
+      headers: { Prefer: 'resolution=merge-duplicates,return=representation' }, body: JSON.stringify(row) });
+    if (r && r[0]) this.lastSeen = r[0].updated_at;
+  },
+  async loadBoard() {
+    const r = await this.rest('profiles?select=user_id,nick,firm,rep,earned,money,worth,sites,machines,workers,done,failed,play_time,inds&limit=500');
+    return r || [];
+  },
+  async deleteSave() { await this.rest(`saves?user_id=eq.${this.session.user.id}`, { method: 'DELETE' }); this.lastSeen = null; },
+  async listOffers(itemId) { return []; },          // trh mezi hráči – později
   async createOffer(itemId, qty, unitPrice) {},
   async buyOffer(offerId, qty) {}
 };
+Cloud.restore();
+const isAdmin = () => Cloud.on && ADMIN_EMAILS.includes(String(Cloud.session.user.email || '').toLowerCase());
+const cloudErr = e => /^CHEAT/.test(e.message) ? 'Server odmítl uložení: ' + e.message.replace(/^CHEAT:\s*/, '')
+  : /Invalid login/i.test(e.message) ? 'Špatný e-mail nebo heslo.'
+  : /already registered|already been registered/i.test(e.message) ? 'Tento e-mail už je registrovaný, zkuste přihlášení.'
+  : /Password should be|weak/i.test(e.message) ? 'Heslo je moc slabé (alespoň 6 znaků).'
+  : /valid email|invalid format/i.test(e.message) ? 'Zadejte platný e-mail.'
+  : /rate limit/i.test(e.message) ? 'Příliš mnoho pokusů, chvíli počkejte.'
+  : /relation .* does not exist|schema cache/i.test(e.message) ? 'V databázi chybí tabulky – spusťte supabase-schema.sql v SQL Editoru.'
+  : /Failed to fetch|NetworkError|Load failed/i.test(e.message) ? 'Nelze se spojit se serverem.' : e.message;
+
+function applyCloudSave(row) {
+  const s = sanitize(row.data);
+  if (!s) { toast('Cloudové uložení je poškozené', true); return false; }
+  G = s; START = STARTS[G.start]; G.last = Date.now(); fillBoard(); save();
+  $('#start').hidden = true; $('#modal').hidden = true;
+  curTab = 'orders'; viewSig = ''; markTab(); renderHeader(); renderView(true);
+  toast('☁️ Postup načten z cloudu');
+  return true;
+}
+/* Po přihlášení a při startu: porovná lokální a cloudový postup. */
+async function cloudSync(first) {
+  if (!Cloud.on || Cloud.busy) return;
+  Cloud.busy = true; cloudStatus('Synchronizuji…');
+  try {
+    const row = await Cloud.pull();
+    Cloud.lastSeen = row ? row.updated_at : null;
+    if (!row) { if (G) { await Cloud.push(G); cloudStatus('Uloženo do cloudu', true); } else cloudStatus('Přihlášeno – v cloudu zatím nic není'); }
+    else if (!G) { applyCloudSave(row); cloudStatus('Načteno z cloudu', true); }
+    else {
+      const cp = row.play_time || 0, lp = G.playTime || 0;
+      if (Math.abs(cp - lp) < 10) { await Cloud.push(G); cloudStatus('Synchronizováno', true); }
+      else if (cp > lp) {
+        Cloud.conflict = true;
+        askConfirm(`V cloudu je postup s větším odehraným časem (${fmtDur(cp)}) než v tomto prohlížeči (${fmtDur(lp)}). Načíst cloudový postup? „Zrušit“ ponechá tento a přepíše jím cloud.`, 'Načíst z cloudu',
+          () => { Cloud.conflict = false; applyCloudSave(row); cloudStatus('Načteno z cloudu', true); });
+        confirmCancel = async () => { Cloud.conflict = false; try { await Cloud.push(G); cloudStatus('Cloud přepsán tímto postupem', true); } catch (e) { /^CHEAT/.test(e.message) ? cloudRejected(e) : cloudStatus('Chyba: ' + cloudErr(e)); } };
+        cloudStatus('Čeká na vaše rozhodnutí');
+      } else { await Cloud.push(G); cloudStatus('Cloud aktualizován (tento postup je novější)', true); }
+    }
+  } catch (e) { if (/^CHEAT/.test(e.message)) cloudRejected(e); else cloudStatus('Chyba: ' + cloudErr(e)); }
+  Cloud.busy = false;
+}
+/* Server (kontrola věrohodnosti) uložení odmítl: nabídne návrat k poslednímu platnému postupu z cloudu. */
+let rejectAsked = 0;
+async function cloudRejected(e) {
+  cloudStatus(cloudErr(e));
+  if (Date.now() - rejectAsked < 600000) return;
+  rejectAsked = Date.now();
+  let row = null; try { row = await Cloud.pull(); } catch (x) {}
+  askConfirm(`${cloudErr(e)}. Postup vypadá podezřele rychle rostoucí, proto se neukládá. ` + (row ? 'Načíst poslední platný postup z cloudu? „Zrušit“ ponechá tento postup jen v prohlížeči (do cloudu se ukládat nebude).' : 'V cloudu zatím žádný platný postup není.'),
+    row ? 'Načíst z cloudu' : 'Rozumím', () => { if (row) applyCloudSave(row); });
+}
+/* Pravidelné ukládání (každou minutu a při odchodu). Když mezitím jiné zařízení uložilo novější postup, zeptá se. */
+async function cloudPush(keepalive) {
+  if (!Cloud.on || !G || Cloud.busy || Cloud.conflict) return;
+  Cloud.busy = true;
+  try {
+    if (!keepalive) {
+      const head = await Cloud.head();
+      if (head && Cloud.lastSeen && head !== Cloud.lastSeen) {      // změna z jiného zařízení
+        Cloud.busy = false; Cloud.lastSeen = null; return cloudSync();
+      }
+    }
+    await Cloud.push(G, keepalive); Cloud.lastPush = Date.now(); cloudStatus('Uloženo do cloudu', true);
+  } catch (e) { if (/^CHEAT/.test(e.message)) cloudRejected(e); else cloudStatus('Chyba: ' + cloudErr(e)); }
+  Cloud.busy = false;
+}
+function cloudStatus(t, ok) {
+  Cloud.status = ok ? `${t} · ${new Date().toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' })}` : t;
+  document.querySelectorAll('[data-cloudstat]').forEach(e => { e.textContent = Cloud.status; });
+}
+function accountHtml() {
+  if (Cloud.on) return `<div class="small">Přihlášen: <b>${esc(Cloud.session.nick)}</b> (${esc(Cloud.session.user.email)})</div>
+    <div class="small" data-cloudstat>${esc(Cloud.status)}</div>
+    <div class="row" style="margin-top:8px"><button class="btn ghost" data-cact="sync">Uložit do cloudu teď</button>
+    <button class="btn danger" data-cact="logout">Odhlásit</button></div>`;
+  return `<div class="small">Přihlášením se postup ukládá do cloudu a můžete pokračovat na jiném zařízení.</div>
+    <label class="small">E-mail <input type="email" data-cf="email" autocomplete="email"></label>
+    <label class="small">Heslo (min. 6 znaků) <input type="password" data-cf="pass" autocomplete="current-password"></label>
+    <label class="small">Přezdívka (jen při registraci) <input type="text" data-cf="nick" maxlength="20"></label>
+    <div class="row" style="margin-top:8px"><button class="btn" data-cact="login">Přihlásit</button>
+    <button class="btn ghost" data-cact="signup">Registrovat</button></div>
+    <div class="small" data-cloudstat style="margin-top:6px"></div>`;
+}
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-cact]');
+  if (!b || b.disabled) return;
+  const box = b.closest('[data-account]') || document;
+  const f = k => { const i = box.querySelector(`[data-cf="${k}"]`); return i ? i.value.trim() : ''; };
+  const act = b.dataset.cact;
+  const refresh = () => { document.querySelectorAll('[data-account]').forEach(x => { x.innerHTML = accountHtml(); }); };
+  if (act === 'logout') { e.preventDefault(); await doLogout(); return; }
+  if (act === 'sync') { Cloud.lastSeen = Cloud.lastSeen; await cloudPush(); return; }
+  const email = f('email'), pass = f('pass'), nick = f('nick');
+  if (!email || !pass) { cloudStatus('Vyplňte e-mail a heslo.'); return; }
+  if (act === 'signup' && nick.length < 3) { cloudStatus('Přezdívka musí mít alespoň 3 znaky.'); return; }
+  b.disabled = true; cloudStatus('Pracuji…');
+  try {
+    if (act === 'signup') { const r = await Cloud.signUp(email, pass, nick); if (r === 'confirm') { cloudStatus('Hotovo – potvrďte e-mail (odkaz vám přišel) a pak se přihlaste.'); b.disabled = false; return; } }
+    else await Cloud.signIn(email, pass);
+    refresh();
+    await afterLogin();
+  } catch (err) { cloudStatus(cloudErr(err)); }
+  b.disabled = false;
+});
 
 /* ===================== OBRÁZKY A PLÁN HALY ===================== */
 const IMG = {};                                // id stroje -> nalezený soubor, nebo null (žádný není)
@@ -960,11 +1180,17 @@ function sanitize(s) {
 }
 function save() {
   if (!G) return;
-  try { localStorage.setItem(SAVE_KEY, JSON.stringify(G)); } catch (e) { /* plné úložiště apod. */ }
+  if (!Cloud.on) return;                      // bez přihlášení se nehraje ani neukládá
+  try { localStorage.setItem(saveKey(), JSON.stringify(G)); } catch (e) { /* plné úložiště apod. */ }
 }
 function load() {
   try {
-    const raw = localStorage.getItem(SAVE_KEY);
+    if (!Cloud.on) return null;
+    let raw = localStorage.getItem(saveKey());
+    if (!raw) {                                   // jednorázový převod staré hry z doby před účty
+      const old = localStorage.getItem(SAVE_KEY);
+      if (old) { localStorage.setItem(saveKey(), old); localStorage.removeItem(SAVE_KEY); raw = old; }
+    }
     return raw ? sanitize(JSON.parse(raw)) : null;
   } catch (e) { return null; }
 }
@@ -1375,6 +1601,7 @@ const TABS = [
   ['workers',  '👷', 'Lidé'],
   ['company',  '🏢', 'Firma'],
   ['upgrades', '⬆️', 'Vylepšení'],
+  ['board',    '🏆', 'Žebříček'],
   ['more',     '⚙️', 'Více']
 ];
 const prodLabel = () => { const a = new Set(G.sites.map(x => x.ind)); return a.size > 1 ? 'Provoz' : TM([...a][0]).tab; };
@@ -1413,6 +1640,7 @@ function build() {
     case 'workers': return buildWorkers();
     case 'company': return buildCompany();
     case 'upgrades': return buildUpgrades();
+    case 'board': return buildBoard();
     default: return buildMore();
   }
 }
@@ -1424,6 +1652,7 @@ function update() {
     case 'workers': return updateWorkers();
     case 'company': return updateCompany();
     case 'upgrades': return updateUpgrades();
+    case 'board': return;
     default: return updateMore();
   }
 }
@@ -1638,8 +1867,31 @@ function updateMachines() {
 function buildWorkers() {
   let h = `<div class="hint">Pracovníka přiřadíte ke <b>konkrétnímu stroji</b>. Výkon = stroj × pracovník.
     Na ručním nářadí je rozdíl mezi lidmi malý, na CNC a linkách rozhoduje zkušenost: mistr stroj naplno využije,
-    brigádník jen zčásti. Stanice zpracovává jednu zakázku, mzda se platí za odpracovaný čas a strhne se z odměny.</div>
-    <h2 class="sec">Kancelář a sklad</h2>`;
+    brigádník jen zčásti. Stanice zpracovává jednu zakázku, mzda se platí za odpracovaný čas a strhne se z odměny.</div>`;
+  h += `<h2 class="sec">Najmout</h2>`;
+  for (const tier of WORKER_ORDER) {
+    const t = WORKER[tier];
+    h += `<div class="card slim"><div><b>${t.icon} ${t.name}</b>
+      <div class="small">${t.desc} · rychlost ×${t.speed} · mzda ${Math.round(t.wage * 60)} Kč/min práce</div></div>
+      <button class="btn" data-act="hire" data-tier="${tier}"></button></div>`;
+  }
+  h += `<h2 class="sec">Zaměstnanci (${G.workers.length})</h2>`;
+  if (!G.workers.length) h += `<div class="empty">Nikoho nezaměstnáváte.</div>`;
+  for (const w of G.workers) {
+    const t = WORKER[w.tier];
+    const opts = G.sites.map(site => MACHINES.filter(m => site.techs[m.step] && (site.machines[m.id] || 0) > 0 &&
+        (freeSlots(m.id, w.id, site.id) > 0 || (w.mid === m.id && (w.site || 0) === site.id)))
+      .map(m => `<option value="${site.id}|${m.id}"${w.mid === m.id && (w.site || 0) === site.id ? ' selected' : ''}>${G.sites.length > 1 ? esc(site.name) + ': ' : ''}${STEPS[m.step].icon} ${m.name}</option>`).join('')).join('');
+    const wm = w.mid && MACH[w.mid];
+    h += `<div class="card wk${w.mid ? ' ok' : ''}" data-wid="${w.id}">${wm ? imgTag(wm).replace('<img ', '<img class="wkbg" ') : ''}
+      <div class="row"><b>${t.icon} ${esc(w.name)}</b><span class="tag">${t.name}</span></div>
+      <label class="small">Pracuje na stroji
+        <select data-assign="${w.id}"><option value=""${w.mid ? '' : ' selected'}>– nepřidělen –</option>${opts}</select></label>
+      <div class="small" style="margin-top:6px" data-wi></div>
+      <button class="btn danger" style="margin-top:8px" data-act="fire" data-id="${w.id}">Propustit</button>
+    </div>`;
+  }
+  h += `<h2 class="sec">Kancelář a sklad</h2>`;
   for (const role of STAFF_ORDER) {
     const r = STAFF[role], st = G.staff[role];
     if (st) {
@@ -1655,28 +1907,6 @@ function buildWorkers() {
         <div class="btns" style="margin-top:8px;min-width:0">${STAFF_TIERS.map(t =>
           `<button class="btn ghost" data-act="staff-hire" data-role="${role}" data-tier="${t}"></button>`).join('')}</div></div>`;
     }
-  }
-  h += `<h2 class="sec">Najmout</h2>`;
-  for (const tier of WORKER_ORDER) {
-    const t = WORKER[tier];
-    h += `<div class="card slim"><div><b>${t.icon} ${t.name}</b>
-      <div class="small">${t.desc} · rychlost ×${t.speed} · mzda ${Math.round(t.wage * 60)} Kč/min práce</div></div>
-      <button class="btn" data-act="hire" data-tier="${tier}"></button></div>`;
-  }
-  h += `<h2 class="sec">Zaměstnanci (${G.workers.length})</h2>`;
-  if (!G.workers.length) h += `<div class="empty">Nikoho nezaměstnáváte.</div>`;
-  for (const w of G.workers) {
-    const t = WORKER[w.tier];
-    const opts = G.sites.map(site => MACHINES.filter(m => site.techs[m.step] && (site.machines[m.id] || 0) > 0 &&
-        (freeSlots(m.id, w.id, site.id) > 0 || (w.mid === m.id && (w.site || 0) === site.id)))
-      .map(m => `<option value="${site.id}|${m.id}"${w.mid === m.id && (w.site || 0) === site.id ? ' selected' : ''}>${G.sites.length > 1 ? esc(site.name) + ': ' : ''}${STEPS[m.step].icon} ${m.name}</option>`).join('')).join('');
-    h += `<div class="card wk${w.mid ? ' ok' : ''}" data-wid="${w.id}">
-      <div class="row"><b>${t.icon} ${esc(w.name)}</b><span class="tag">${t.name}</span></div>
-      <label class="small">Pracuje na stroji
-        <select data-assign="${w.id}"><option value=""${w.mid ? '' : ' selected'}>– nepřidělen –</option>${opts}</select></label>
-      <div class="small" style="margin-top:6px" data-wi></div>
-      <button class="btn danger" style="margin-top:8px" data-act="fire" data-id="${w.id}">Propustit</button>
-    </div>`;
   }
   return h;
 }
@@ -1883,6 +2113,45 @@ function updateUpgrades() {
 }
 
 /* --- Více --- */
+/* --- Žebříček hráčů --- */
+const BOARD_COLS = [
+  ['rep', '⭐ Reputace', v => fmt(v)], ['earned', '💰 Celkem vyděláno', v => fmt(v) + ' Kč'], ['money', '👛 Peníze na účtu', v => fmt(v) + ' Kč'],
+  ['worth', '🏦 Majetek (peníze + zásoba)', v => fmt(v) + ' Kč'], ['sites', '🏢 Střediska', v => fmt(v)], ['done', '📋 Zakázky', v => fmt(v)],
+  ['machines', '🏭 Stroje', v => fmt(v)], ['workers', '👷 Zaměstnanci', v => fmt(v)], ['play_time', '⏱️ Čas hraní', v => fmtDur(v)]
+];
+const board = { rows: null, loading: false, err: '', sort: 'rep', at: 0 };
+async function loadBoard() {
+  if (board.loading || !Cloud.on) return;
+  board.loading = true;
+  try { board.rows = await Cloud.loadBoard(); board.err = ''; board.at = Date.now(); }
+  catch (e) { board.err = cloudErr(e); }
+  board.loading = false;
+  if (curTab === 'board') renderView(true);
+}
+function buildBoard() {
+  if (!board.loading && (!board.rows || Date.now() - board.at > 60000) && !board.err) setTimeout(loadBoard, 0);
+  const col = BOARD_COLS.find(c => c[0] === board.sort);
+  const me = Cloud.session && Cloud.session.user.id;
+  let h = `<div class="hint">Porovnejte se s ostatními hráči. Údaje se obnovují při ukládání postupu do cloudu (každou minutu).</div>
+    <div class="chips" style="margin:8px 2px">${BOARD_COLS.map(c => `<button class="chip${c[0] === board.sort ? ' cur' : ''}" data-act="bsort" data-col="${c[0]}">${c[1]}</button>`).join('')}
+    <button class="chip" data-act="brefresh">↻ Obnovit</button></div>`;
+  if (board.err) h += `<div class="empty">⚠️ ${esc(board.err)}</div>`;
+  else if (!board.rows) h += `<div class="empty">Načítám žebříček…</div>`;
+  else if (!board.rows.length) h += `<div class="empty">Zatím tu nikdo není.</div>`;
+  else {
+    const rows = board.rows.slice().sort((a, b) => (b[board.sort] || 0) - (a[board.sort] || 0) || (b.rep || 0) - (a.rep || 0));
+    const mi = rows.findIndex(r => r.user_id === me);
+    h += `<h2 class="sec">${col[1]}${mi >= 0 ? ` · vaše místo: ${mi + 1}. z ${rows.length}` : ''}</h2>`;
+    rows.slice(0, 50).forEach((r, i) => {
+      const inds = (r.inds || '').split(',').filter(x => INDUSTRIES[x]).map(x => INDUSTRIES[x].icon).join('');
+      h += `<div class="card${r.user_id === me ? ' ok' : ''}"><div class="row"><b>${['🥇', '🥈', '🥉'][i] || (i + 1) + '.'} ${esc(r.nick)}${r.user_id === me ? ' (vy)' : ''}</b>
+        <span class="tag">${col[2](r[board.sort] || 0)}</span></div>
+        <div class="small">${r.firm ? esc(r.firm) + ' · ' : ''}${inds} ${RANKS.filter(x => (r.rep || 0) >= x[0]).pop()[1]}</div>
+        <div class="small">⭐ ${fmt(r.rep || 0)} · 💰 vyděláno ${fmt(r.earned || 0)} Kč · 👛 ${fmt(r.money || 0)} Kč · 🏢 ${r.sites || 1} · 🏭 ${r.machines || 0} · 👷 ${r.workers || 0} · 📋 ${r.done || 0}</div></div>`;
+    });
+  }
+  return h;
+}
 function buildMore() {
   return `
   <div class="card"><h3>Vaše dílna</h3>
@@ -1894,8 +2163,7 @@ function buildMore() {
     <button class="btn full ghost" disabled>Otevřít trh (brzy)</button>
   </div>
   <div class="card"><h3>👤 Účet a cloudové ukládání</h3>
-    <div class="small">Zatím se postup ukládá jen v tomto prohlížeči. Přihlášení přibude s připojením Supabase.</div>
-    <button class="btn full ghost" disabled>Přihlásit se (brzy)</button>
+    <div data-account>${accountHtml()}</div>
   </div>
   <div class="card"><h3>💾 Záloha postupu</h3>
     <div class="small">Přenos mezi zařízeními: exportujte text a vložte ho do hry na jiném zařízení.</div>
@@ -1910,15 +2178,15 @@ function buildMore() {
     <div class="small">Hra hledá soubory ve složce <b>Grafika Stroje</b> vedle index.html. Kontrola ukáže, které se našly.</div>
     <button class="btn ghost full" data-act="imgcheck">Zkontrolovat obrázky</button>
     <div class="small" data-imgres style="margin-top:8px"></div></div>
-  <div class="card"><h3>🧪 Testování</h3>
-    <div class="small">Pomůcky pro zkoušení hry (později je můžeme odebrat).</div>
+  ${isAdmin() ? `<div class="card"><h3>🛠️ Admin panel</h3>
+    <div class="small">Testovací pomůcky, vidí je jen administrátor.</div>
     <div class="row" style="margin-top:8px">
       <button class="btn ghost" data-act="cheatmoney">+10 000 Kč</button>
       <button class="btn ghost" data-act="cheatrep">+25 ⭐</button>
       <button class="btn ghost" data-act="cheattech">Všechny technologie</button>
       <button class="btn ghost" data-act="cheathall">Největší hala</button>
     </div>
-  </div>`;
+  </div>` : ''}`;
 }
 function updateMore() {
   const s = view.querySelector('[data-stats]');
@@ -1932,6 +2200,9 @@ view.addEventListener('click', e => {
   const b = e.target.closest('[data-act]');
   if (!b || b.disabled || !G) return;
   const act = b.dataset.act, id = b.dataset.id;
+  if (act.startsWith('cheat') && !isAdmin()) return;
+  if (act === 'bsort') { board.sort = b.dataset.col; renderView(true); return; }
+  if (act === 'brefresh') { board.at = 0; board.err = ''; loadBoard(); return; }
 
   if (act === 'accept') {
     const o = G.orders.find(x => x.id == id);
@@ -2063,13 +2334,7 @@ view.addEventListener('click', e => {
       });
     } catch (err) { toast('Import se nepovedl – zkontrolujte kód', true); }
   } else if (act === 'reset') {
-    askConfirm('Opravdu začít novou hru? Veškerý postup se smaže.', 'Začít novou hru', () => {
-      G = null; START = null;                       // aby ho pagehide/interval znovu neuložil
-      try { localStorage.removeItem(SAVE_KEY); } catch (e) {}
-      curTab = 'orders'; viewSig = ''; markTab();
-      view.innerHTML = '';
-      showStart();
-    });
+    resetStep1();
   } else if (act === 'cheatmoney') {
     G.money += 10000; renderHeader(); renderView(false);
   } else if (act === 'cheatrep') {
@@ -2153,10 +2418,14 @@ $('#modal').addEventListener('click', e => {
       toast(`🏭 Nové středisko: ${STEPS[st].name}`);
       closeCoop(); renderView(true); renderHeader();
     }
+  } else if (act === 'resetnext') {
+    resetStep2();
+  } else if (act === 'resetgo') {
+    if (!b.disabled) resetGame();
   } else if (act === 'coopclose') {
     closeCoop();
   } else if (act === 'confyes') {
-    const cb = confirmCb; closeCoop();
+    const cb = confirmCb; confirmCancel = null; closeCoop();
     if (cb) cb();
   } else if (act === 'plan') {
     planSel[b.dataset.step] = b.dataset.opt;
@@ -2177,6 +2446,27 @@ $('#tabs').addEventListener('click', e => {
 });
 
 /* ===================== START ===================== */
+function showLogin() {
+  const el = $('#start');
+  el.hidden = false;
+  el.innerHTML = `<div class="start-box">
+    <h1>🏭 Plechárna</h1>
+    <p class="small">Pro hru se musíte přihlásit. Každý účet má svou vlastní hru a ukládá se do cloudu.</p>
+    <div class="card" data-account>${accountHtml()}</div></div>`;
+}
+/* Po přihlášení: načte hru tohoto účtu (lokální, pak cloudovou), případně nabídne novou. */
+async function afterLogin() {
+  G = load();
+  if (G) { START = STARTS[G.start]; fillBoard(); $('#start').hidden = true; renderHeader(); renderView(true); frame(); }
+  await cloudSync(true);
+  if (!G && Cloud.on) showStart();
+}
+async function doLogout() {
+  save(); try { await cloudPush(true); } catch (e) {}
+  G = null; START = null; await Cloud.signOut();
+  $('#modal').hidden = true; view.innerHTML = ''; viewSig = '';
+  showLogin();
+}
 function showStart() {
   const el = $('#start');
   el.hidden = false;
@@ -2192,6 +2482,7 @@ function showStart() {
         <b>${x.icon} ${x.name}</b><span>${x.desc}</span>
         <em>${x.perkText} · start ${x.money} Kč</em>
       </button>`).join('')).join('')}
+    <div class="small" style="margin-top:14px">Přihlášen: <b>${esc(Cloud.session ? Cloud.session.nick : '')}</b> · <a href="#" data-cact="logout">odhlásit</a></div>
   </div>`;
 }
 $('#start').addEventListener('click', e => {
@@ -2208,7 +2499,9 @@ $('#start').addEventListener('click', e => {
 function init() {
   buildTabs();
   G = load();
-  if (G) {
+  if (!Cloud.on) {
+    showLogin();
+  } else if (G) {
     START = STARTS[G.start];
     fillBoard();
     renderHeader(); renderView(true);
@@ -2218,8 +2511,11 @@ function init() {
   }
   setInterval(frame, 200);
   setInterval(save, 5000);
-  document.addEventListener('visibilitychange', () => { if (document.hidden) save(); else frame(); });
-  window.addEventListener('pagehide', save);
+  setInterval(() => { if (!document.hidden) cloudPush(); }, 60000);
+  if (Cloud.on) cloudSync(true);
+  setInterval(() => { if (G && !Cloud.on) { G = null; START = null; view.innerHTML = ''; showLogin(); } }, 3000);   // vypršelo přihlášení
+  document.addEventListener('visibilitychange', () => { if (document.hidden) { save(); cloudPush(true); } else frame(); });
+  window.addEventListener('pagehide', () => { save(); cloudPush(true); });
 }
 init();
 </script>
